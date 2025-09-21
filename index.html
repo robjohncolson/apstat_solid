@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="js/charts.js"></script>
 
 </head>
@@ -20,6 +21,8 @@
     </div>
 
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+    <button class="sync-button" onclick="showSyncModal()" title="Sync & Export Data">⚡</button>
+    <button class="user-button" onclick="showUserManagement()" title="Switch User" style="display: none;">👤</button>
 <script src="data/curriculum.js"></script>
     <script src="data/units.js"></script>
     <script>
@@ -254,6 +257,7 @@
                 initClassData();
                 showUsernameWelcome();
                 initializeFromEmbeddedData(); // Initialize from embedded data
+                updateCurrentUsernameDisplay();
             } else {
                 showUsernamePrompt();
             }
@@ -305,15 +309,17 @@
                                 </button>
                             </div>
 
-                            <!-- QR Code -->
+                            <!-- Excel Import -->
                             <div class="recovery-option">
-                                <div class="option-icon">📱</div>
-                                <h3>Scan QR Code</h3>
-                                <p class="option-description">Scan your username QR code</p>
-                                <button onclick="showQRScanner()" class="action-button secondary">
-                                    Open Scanner
+                                <div class="option-icon">📊</div>
+                                <h3>Import with Excel Mapping</h3>
+                                <p class="option-description">Import master data using Excel student roster</p>
+                                <button onclick="showExcelImportModal()"
+                                        class="action-button secondary">
+                                    Excel Import
                                 </button>
                             </div>
+
                         </div>
 
                         <!-- Recently Used Usernames (if any in localStorage) -->
@@ -351,21 +357,6 @@
                         </div>
                     </div>
 
-                    <!-- QR Scanner Modal (hidden by default) -->
-                    <div id="qrScannerModal" class="modal" style="display: none;">
-                        <div class="modal-content qr-scanner">
-                            <span class="close-modal" onclick="closeQRScanner()">&times;</span>
-                            <h3>Scan Username QR Code</h3>
-                            <div id="qrReader"></div>
-                            <input type="text"
-                                   id="qrManualInput"
-                                   placeholder="Or enter code manually"
-                                   class="username-input">
-                            <button onclick="processQRCode()" class="action-button primary">
-                                Submit Code
-                            </button>
-                        </div>
-                    </div>
                 </div>
             `;
 
@@ -395,6 +386,7 @@
             initClassData();
             showUsernameWelcome();
             initializeFromEmbeddedData();
+            updateCurrentUsernameDisplay();
         }
 
         // Function to recover username from manual input
@@ -450,32 +442,54 @@
                     // Try to find username in various formats
                     let username = null;
 
-                    // Check for direct username field
+                    // Check for direct username field (personal export)
                     if (data.username) {
                         username = data.username;
                     }
-                    // Check for export format
-                    else if (data.exportTime && data.users) {
-                        const usernames = Object.keys(data.users);
+                    // Check for master export format with exportTime and students
+                    else if (data.exportTime && data.students) {
+                        const usernames = Object.keys(data.students);
                         if (usernames.length === 1) {
                             username = usernames[0];
                         } else if (usernames.length > 1) {
-                            // Show selection dialog
-                            showUsernameSelection(usernames);
+                            // Show selection dialog for multiple users
+                            showUsernameSelection(usernames, data);
                             return;
                         }
                     }
-                    // Check for class data format
+                    // Check for master database format with exportType
+                    else if (data.exportType === 'master_database' && data.allUsers) {
+                        if (data.allUsers.length === 1) {
+                            username = data.allUsers[0];
+                        } else if (data.allUsers.length > 1) {
+                            showUsernameSelection(data.allUsers, data);
+                            return;
+                        }
+                    }
+                    // Check for class data format with users field
                     else if (data.users) {
                         const usernames = Object.keys(data.users);
-                        if (usernames.length > 0) {
-                            showUsernameSelection(usernames);
+                        if (usernames.length === 1) {
+                            username = usernames[0];
+                        } else if (usernames.length > 0) {
+                            showUsernameSelection(usernames, data);
+                            return;
+                        }
+                    }
+                    // Check for students field (alternative format)
+                    else if (data.students) {
+                        const usernames = Object.keys(data.students);
+                        if (usernames.length === 1) {
+                            username = usernames[0];
+                        } else if (usernames.length > 0) {
+                            showUsernameSelection(usernames, data);
                             return;
                         }
                     }
 
                     if (username) {
-                        checkExistingData(username);
+                        // If we found a single username, import the data directly
+                        importDataForUser(username, data);
                     } else {
                         showMessage('No username found in this file', 'error');
                     }
@@ -488,7 +502,13 @@
         }
 
         // Function to show username selection dialog
-        function showUsernameSelection(usernames) {
+        // Store import data globally for use after username selection
+        let pendingImportData = null;
+
+        function showUsernameSelection(usernames, importData = null) {
+            // Store the import data for later use
+            pendingImportData = importData;
+
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.display = 'block';
@@ -501,12 +521,13 @@
 
             modal.innerHTML = `
                 <div class="modal-content">
-                    <span class="close-modal" onclick="this.parentElement.parentElement.remove()">&times;</span>
+                    <span class="close-modal" onclick="closeUsernameSelection()">&times;</span>
                     <h3>Select Your Username</h3>
                     <p>Multiple usernames found. Please select yours:</p>
                     <div class="username-options">
                         ${optionsHTML}
                     </div>
+                    ${importData ? '<p><small>After selection, your data will be imported.</small></p>' : ''}
                 </div>
             `;
 
@@ -515,7 +536,538 @@
 
         window.selectUsername = function(username) {
             document.querySelector('.modal').remove();
-            checkExistingData(username);
+
+            // If we have pending import data, import it first
+            if (pendingImportData) {
+                importDataForUser(username, pendingImportData);
+                pendingImportData = null;
+            } else {
+                checkExistingData(username);
+            }
+        }
+
+        window.closeUsernameSelection = function() {
+            document.querySelector('.modal').remove();
+            pendingImportData = null;
+        }
+
+        // Function to import data for a specific user
+        function importDataForUser(username, importData) {
+            try {
+                // Set the username first
+                currentUsername = username;
+                localStorage.setItem('consensusUsername', username);
+                initClassData();
+
+                // Import data based on format
+                if (importData.exportTime && importData.students && importData.students[username]) {
+                    // Handle exportTime/students format (like master_peer_data file)
+                    const userData = importData.students[username];
+                    if (userData.answers) {
+                        localStorage.setItem(`answers_${username}`, JSON.stringify(userData.answers));
+                    }
+                    if (userData.progress) {
+                        localStorage.setItem(`progress_${username}`, JSON.stringify(userData.progress));
+                    }
+
+                    // Import other students as peer data
+                    const allStudents = {};
+                    Object.keys(importData.students).forEach(otherUsername => {
+                        if (otherUsername !== username) {
+                            allStudents[otherUsername] = importData.students[otherUsername];
+                        }
+                    });
+
+                    // Store peer data in classData format
+                    const classData = JSON.parse(localStorage.getItem('classData') || '{}');
+                    if (!classData.users) classData.users = {};
+
+                    Object.keys(allStudents).forEach(otherUsername => {
+                        if (!classData.users[otherUsername]) {
+                            classData.users[otherUsername] = { answers: {}, reasons: {}, timestamps: {}, attempts: {} };
+                        }
+
+                        if (allStudents[otherUsername].answers) {
+                            Object.keys(allStudents[otherUsername].answers).forEach(questionId => {
+                                const answer = allStudents[otherUsername].answers[questionId];
+                                classData.users[otherUsername].answers[questionId] = answer.value || answer;
+                                if (answer.timestamp) {
+                                    classData.users[otherUsername].timestamps[questionId] = answer.timestamp;
+                                }
+                            });
+                        }
+                    });
+
+                    localStorage.setItem('classData', JSON.stringify(classData));
+                    showMessage(`Data imported successfully for ${username}! Found ${Object.keys(allStudents).length} peer students.`, 'success');
+                }
+                else if (importData.exportType === 'master_database') {
+                    // Handle master database format
+                    if (importData.allAnswers && importData.allAnswers[username]) {
+                        localStorage.setItem(`answers_${username}`, JSON.stringify(importData.allAnswers[username]));
+                    }
+                    if (importData.allProgress && importData.allProgress[username]) {
+                        localStorage.setItem(`progress_${username}`, JSON.stringify(importData.allProgress[username]));
+                    }
+                    if (importData.classData) {
+                        localStorage.setItem('classData', JSON.stringify(importData.classData));
+                    }
+                    showMessage(`Master database imported successfully for ${username}!`, 'success');
+                }
+                else {
+                    // Handle simple personal export
+                    showMessage(`Username set to ${username} from import file.`, 'success');
+                }
+
+                // Initialize and show welcome
+                showUsernameWelcome();
+                initializeFromEmbeddedData();
+
+            } catch (error) {
+                showMessage('Error importing data: ' + error.message, 'error');
+                console.error('Import error:', error);
+            }
+        }
+
+        // Excel Integration Functions
+        let excelMappingData = null;
+        let masterDataForExcel = null;
+
+        window.showExcelImportModal = function() {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            modal.id = 'excelImportModal';
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close-modal" onclick="closeExcelImportModal()">&times;</span>
+                    <h3>📊 Excel Import Setup</h3>
+                    <p>Import master class data with Excel student mapping</p>
+
+                    <div class="excel-import-steps">
+                        <div class="import-step">
+                            <h4>Step 1: Select Master Data File</h4>
+                            <p>Choose your exported class data (JSON file)</p>
+                            <input type="file"
+                                   id="masterDataFile"
+                                   accept=".json"
+                                   onchange="loadMasterDataFile(event)">
+                            <div id="masterDataStatus" class="file-status"></div>
+                        </div>
+
+                        <div class="import-step">
+                            <h4>Step 2: Select Excel Student Roster</h4>
+                            <p>Choose Excel file with student names and usernames</p>
+                            <input type="file"
+                                   id="excelMappingFile"
+                                   accept=".xlsx,.xls"
+                                   onchange="loadExcelMappingFile(event)">
+                            <div id="excelMappingStatus" class="file-status"></div>
+                        </div>
+
+                        <div class="import-step">
+                            <h4>Step 3: Select Your Name</h4>
+                            <p>Choose your name from the Excel roster</p>
+                            <select id="studentNameSelect" disabled>
+                                <option value="">Load Excel file first...</option>
+                            </select>
+                        </div>
+
+                        <div class="excel-import-actions">
+                            <button onclick="processExcelImport()"
+                                    id="processExcelImportBtn"
+                                    class="action-button primary"
+                                    disabled>
+                                Import Data
+                            </button>
+                            <button onclick="closeExcelImportModal()"
+                                    class="action-button secondary">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        }
+
+        window.closeExcelImportModal = function() {
+            const modal = document.getElementById('excelImportModal');
+            if (modal) {
+                modal.remove();
+            }
+            excelMappingData = null;
+            masterDataForExcel = null;
+        }
+
+        window.loadMasterDataFile = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    masterDataForExcel = JSON.parse(e.target.result);
+                    document.getElementById('masterDataStatus').innerHTML =
+                        `<span style="color: green;">✓ Master data loaded (${Object.keys(masterDataForExcel.students || masterDataForExcel.allUsers || {}).length} students)</span>`;
+                    checkExcelImportReady();
+                } catch (error) {
+                    document.getElementById('masterDataStatus').innerHTML =
+                        `<span style="color: red;">✗ Invalid JSON file</span>`;
+                    masterDataForExcel = null;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        window.loadExcelMappingFile = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    // Parse Excel data - expect columns like: Name, Username or Student Name, AP Stats Username
+                    excelMappingData = parseExcelMapping(jsonData);
+
+                    if (excelMappingData && excelMappingData.length > 0) {
+                        populateStudentSelect(excelMappingData);
+                        document.getElementById('excelMappingStatus').innerHTML =
+                            `<span style="color: green;">✓ Excel loaded (${excelMappingData.length} students)</span>`;
+                        checkExcelImportReady();
+                    } else {
+                        document.getElementById('excelMappingStatus').innerHTML =
+                            `<span style="color: red;">✗ No student data found. Check Excel format.</span>`;
+                    }
+                } catch (error) {
+                    document.getElementById('excelMappingStatus').innerHTML =
+                        `<span style="color: red;">✗ Error reading Excel file</span>`;
+                    excelMappingData = null;
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function parseExcelMapping(jsonData) {
+            if (!jsonData || jsonData.length < 2) return null;
+
+            const headers = jsonData[0].map(h => h.toString().toLowerCase());
+            const nameColIndex = headers.findIndex(h =>
+                h.includes('name') || h.includes('student')
+            );
+            const usernameColIndex = headers.findIndex(h =>
+                h.includes('username') || h.includes('user') || h.includes('ap')
+            );
+
+            if (nameColIndex === -1 || usernameColIndex === -1) {
+                // Try default columns if headers not found
+                return jsonData.slice(1).map(row => ({
+                    name: row[0] || '',
+                    username: row[1] || ''
+                })).filter(item => item.name && item.username);
+            }
+
+            return jsonData.slice(1).map(row => ({
+                name: row[nameColIndex] || '',
+                username: row[usernameColIndex] || ''
+            })).filter(item => item.name && item.username);
+        }
+
+        function populateStudentSelect(mappingData) {
+            const select = document.getElementById('studentNameSelect');
+            select.innerHTML = '<option value="">Select your name...</option>';
+
+            mappingData.forEach((student, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${student.name} (${student.username})`;
+                select.appendChild(option);
+            });
+
+            select.disabled = false;
+        }
+
+        function checkExcelImportReady() {
+            const btn = document.getElementById('processExcelImportBtn');
+            if (masterDataForExcel && excelMappingData) {
+                btn.disabled = false;
+            }
+        }
+
+        window.processExcelImport = function() {
+            const selectedIndex = document.getElementById('studentNameSelect').value;
+            if (!selectedIndex || !excelMappingData || !masterDataForExcel) {
+                showMessage('Please complete all steps first', 'error');
+                return;
+            }
+
+            const selectedStudent = excelMappingData[selectedIndex];
+            const username = selectedStudent.username;
+
+            // Close modal
+            closeExcelImportModal();
+
+            // Import data for the selected user
+            showMessage(`Importing data for ${selectedStudent.name} (${username})...`, 'info');
+            importDataForUser(username, masterDataForExcel);
+        }
+
+        // Unified Sync Modal System
+        window.showSyncModal = function() {
+            // Remove any existing sync modal
+            const existingModal = document.getElementById('unifiedSyncModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            modal.id = 'unifiedSyncModal';
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close-modal" onclick="closeSyncModal()">&times;</span>
+                    <h2>⚡ Sync & Backup</h2>
+                    <p>Manage your data and collaborate with classmates</p>
+
+                    <div class="sync-sections">
+                        <!-- Student Section -->
+                        <div class="sync-section">
+                            <h3>👨‍🎓 Student Actions</h3>
+                            <div class="sync-buttons">
+                                <button onclick="exportPersonal(); closeSyncModal();" class="sync-btn primary">
+                                    <span class="btn-icon">💾</span>
+                                    <span class="btn-text">
+                                        <strong>Export My Data</strong>
+                                        <small>Download your progress</small>
+                                    </span>
+                                </button>
+                                <button onclick="document.getElementById('syncImportFile').click(); closeSyncModal();" class="sync-btn secondary">
+                                    <span class="btn-icon">📁</span>
+                                    <span class="btn-text">
+                                        <strong>Import Data</strong>
+                                        <small>Load from backup file</small>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Teacher Section -->
+                        <div class="sync-section">
+                            <h3>👩‍🏫 Teacher Actions</h3>
+                            <div class="sync-buttons">
+                                <button onclick="exportMasterData(); closeSyncModal();" class="sync-btn master">
+                                    <span class="btn-icon">🗃️</span>
+                                    <span class="btn-text">
+                                        <strong>Master Export</strong>
+                                        <small>Export all student data</small>
+                                    </span>
+                                </button>
+                                <button onclick="showExcelImportModal(); closeSyncModal();" class="sync-btn excel">
+                                    <span class="btn-icon">📊</span>
+                                    <span class="btn-text">
+                                        <strong>Excel Import</strong>
+                                        <small>Import with student roster</small>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sync-info">
+                        <p><small>💡 <strong>Tip:</strong> Use Ctrl+S anytime to quickly export your data</small></p>
+                        ${currentUsername ? `<p><small>📋 Current user: <strong>${currentUsername}</strong></small></p>` : ''}
+                    </div>
+
+                    <input type="file" id="syncImportFile" accept=".json" style="display: none;" onchange="importClassData(event)">
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // Close modal when clicking outside
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeSyncModal();
+                }
+            });
+        }
+
+        window.closeSyncModal = function() {
+            const modal = document.getElementById('unifiedSyncModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // User Management System
+        window.showUserManagement = function() {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            modal.id = 'userManagementModal';
+
+            // Get recent usernames and existing users from localStorage
+            const recentUsernames = JSON.parse(localStorage.getItem('recentUsernames') || '[]');
+            const allUsernames = [];
+
+            // Scan localStorage for all known usernames
+            for (let key in localStorage) {
+                if (key.startsWith('answers_')) {
+                    const username = key.replace('answers_', '');
+                    if (!allUsernames.includes(username)) {
+                        allUsernames.push(username);
+                    }
+                }
+            }
+
+            // Also check classData for more usernames
+            const classData = JSON.parse(localStorage.getItem('classData') || '{}');
+            if (classData.users) {
+                Object.keys(classData.users).forEach(username => {
+                    if (!allUsernames.includes(username)) {
+                        allUsernames.push(username);
+                    }
+                });
+            }
+
+            const recentUsersHTML = recentUsernames.length > 0 ? `
+                <div class="user-section">
+                    <h4>📝 Recent Users</h4>
+                    <div class="username-grid">
+                        ${recentUsernames.map(username => `
+                            <button onclick="switchToUser('${username}')"
+                                    class="username-btn ${username === currentUsername ? 'current' : ''}">
+                                ${username}
+                                ${username === currentUsername ? ' (current)' : ''}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : '';
+
+            const allUsersHTML = allUsernames.length > 0 ? `
+                <div class="user-section">
+                    <h4>👥 All Known Users</h4>
+                    <div class="username-grid">
+                        ${allUsernames.map(username => `
+                            <button onclick="switchToUser('${username}')"
+                                    class="username-btn ${username === currentUsername ? 'current' : ''}">
+                                ${username}
+                                ${username === currentUsername ? ' (current)' : ''}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : '';
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close-modal" onclick="closeUserManagement()">&times;</span>
+                    <h2>👤 User Management</h2>
+                    <p>Switch between users or create a new one</p>
+
+                    <div class="current-user-info">
+                        <strong>Current User:</strong> <span class="current-username">${currentUsername || 'None'}</span>
+                    </div>
+
+                    ${recentUsersHTML}
+                    ${allUsersHTML}
+
+                    <div class="user-actions">
+                        <button onclick="createNewUser()" class="action-btn primary">
+                            ➕ Create New User
+                        </button>
+                        <button onclick="importExistingUser()" class="action-btn secondary">
+                            📁 Import User Data
+                        </button>
+                    </div>
+
+                    <input type="file" id="userImportFile" accept=".json" style="display: none;" onchange="importUserFromFile(event)">
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // Close modal when clicking outside
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeUserManagement();
+                }
+            });
+        }
+
+        window.closeUserManagement = function() {
+            const modal = document.getElementById('userManagementModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        window.switchToUser = function(username) {
+            if (username === currentUsername) {
+                closeUserManagement();
+                return;
+            }
+
+            // Switch to the new user without clearing localStorage
+            currentUsername = username;
+            localStorage.setItem('consensusUsername', username);
+
+            // Initialize class data for this user
+            initClassData();
+
+            // Show welcome message and initialize
+            showUsernameWelcome();
+            initializeFromEmbeddedData();
+            updateCurrentUsernameDisplay();
+
+            // Close modal
+            closeUserManagement();
+
+            showMessage(`Switched to user: ${username}`, 'success');
+        }
+
+        window.createNewUser = function() {
+            closeUserManagement();
+            // Show the username prompt to create a new user
+            showUsernamePrompt();
+        }
+
+        window.importExistingUser = function() {
+            document.getElementById('userImportFile').click();
+        }
+
+        window.importUserFromFile = function(event) {
+            closeUserManagement();
+            // Use the existing import functionality
+            importUsernameFromFile(event);
+        }
+
+        // Function to show/hide user button based on login status
+        function updateUserButtonVisibility() {
+            const userButton = document.querySelector('.user-button');
+            if (userButton) {
+                userButton.style.display = currentUsername ? 'block' : 'none';
+            }
+        }
+
+        // Call this function whenever currentUsername changes
+        function updateCurrentUsernameDisplay() {
+            updateUserButtonVisibility();
+            // Reinitialize pig sprite with user's saved color
+            if (typeof initializePigSprite === 'function') {
+                initializePigSprite();
+            }
         }
 
         // Function to load recently used usernames
@@ -556,72 +1108,6 @@
             }
         }
 
-        // QR Code Functions
-        window.showQRScanner = function() {
-            document.getElementById('qrScannerModal').style.display = 'block';
-            // Note: Actual QR scanning would require a library like qr-scanner.js
-            showMessage('QR Scanner opened. You can also enter the code manually.', 'info');
-        }
-
-        window.closeQRScanner = function() {
-            document.getElementById('qrScannerModal').style.display = 'none';
-        }
-
-        window.processQRCode = function() {
-            const input = document.getElementById('qrManualInput');
-            const code = input.value.trim();
-
-            if (code) {
-                // Process QR code (could be username or encoded data)
-                if (code.startsWith('APStats:')) {
-                    const username = code.replace('APStats:', '');
-                    checkExistingData(username);
-                    closeQRScanner();
-                } else {
-                    checkExistingData(code);
-                    closeQRScanner();
-                }
-            }
-        }
-
-        // Add function to generate QR code for current user
-        window.generateUsernameQR = function() {
-            if (!currentUsername) return;
-
-            // Create a simple text representation
-            const qrData = `APStats:${currentUsername}`;
-
-            // In real implementation, use QR code library
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'block';
-
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <span class="close-modal" onclick="this.parentElement.parentElement.remove()">&times;</span>
-                    <h3>Your Username QR Code</h3>
-                    <div class="qr-display">
-                        <div class="qr-placeholder">
-                            <p>QR Code for:</p>
-                            <h2>${currentUsername}</h2>
-                            <p class="qr-code-text">Code: APStats:${currentUsername}</p>
-                        </div>
-                        <button onclick="copyUsernameCode('APStats:${currentUsername}')" class="action-button primary">
-                            Copy Code
-                        </button>
-                        <p><small>Save this code or QR image to recover your username later</small></p>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(modal);
-        }
-
-        window.copyUsernameCode = function(code) {
-            navigator.clipboard.writeText(code).then(() => {
-                showMessage('Code copied to clipboard!', 'success');
-            });
-        }
 
         // Enhanced acceptUsername to save to recent list
         const originalAcceptUsername = window.acceptUsername;
@@ -649,8 +1135,7 @@
             const exportData = {
                 username: currentUsername,
                 exportDate: new Date().toISOString(),
-                version: '1.0',
-                qrCode: `APStats:${currentUsername}`
+                version: '1.0'
             };
 
             const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
@@ -2679,6 +3164,11 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 this.velocity = { x: 0, y: 0 };
                 this.color = color;
 
+                // Collision detection properties
+                this.headerCollisions = 0;
+                this.headerHeight = 120; // Define header region height
+                this.bounceThreshold = 3; // Number of bounces before triggering action
+
                 this.createElement();
                 this.bindControls();
                 this.startAnimation();
@@ -2806,6 +3296,29 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     this.y += this.velocity.y;
                     this.velocity.y -= 0.8; // gravity
 
+                    // Check for header collision (top of screen)
+                    const spriteTopPosition = window.innerHeight - this.y - 32; // 32px is sprite height
+                    if (spriteTopPosition <= this.headerHeight && this.velocity.y > 0) {
+                        // Collision with header region
+                        this.headerCollisions++;
+                        this.velocity.y = -Math.abs(this.velocity.y); // Bounce down
+
+                        // Visual feedback for collision
+                        this.element.style.filter = 'brightness(150%) ' + this.getColorFilter(this.color);
+                        setTimeout(() => {
+                            this.element.style.filter = this.getColorFilter(this.color);
+                        }, 200);
+
+                        // Check if we've reached the bounce threshold
+                        if (this.headerCollisions >= this.bounceThreshold) {
+                            this.triggerUsernameManagement();
+                            this.headerCollisions = 0; // Reset counter
+                        }
+
+                        console.log(`Header collision #${this.headerCollisions}`);
+                    }
+
+                    // Ground collision
                     if (this.y <= 100) {
                         this.y = 100;
                         this.velocity.y = 0;
@@ -2845,19 +3358,48 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     localStorage.setItem(`pigColor_${currentUsername}`, newColor);
                 }
             }
+
+            triggerUsernameManagement() {
+                // Add fun visual effect when triggering
+                this.element.style.transform = 'scale(1.5) rotate(360deg)';
+                this.element.style.transition = 'transform 0.5s ease';
+
+                setTimeout(() => {
+                    this.element.style.transform = '';
+                    this.element.style.transition = '';
+                }, 500);
+
+                // Show message and trigger username management
+                showMessage('🐷 Oink! Three bounces unlocked user management!', 'info');
+
+                setTimeout(() => {
+                    if (typeof showUserManagement === 'function') {
+                        showUserManagement();
+                    }
+                }, 600);
+            }
         }
 
         // Initialize the sprite when the page loads
         window.addEventListener('load', () => {
-            // Wait for username to be set
-            setTimeout(() => {
-                if (currentUsername) {
-                    // Load saved color for this user
-                    const savedColor = localStorage.getItem(`pigColor_${currentUsername}`) || 'pink';
-                    window.pigSprite = new PigSprite(savedColor);
-                }
-            }, 1000);
+            // Initialize sprite immediately
+            initializePigSprite();
         });
+
+        // Function to initialize pig sprite based on current user
+        function initializePigSprite() {
+            // Remove existing sprite if present
+            if (window.pigSprite && window.pigSprite.element) {
+                window.pigSprite.element.remove();
+            }
+
+            // Load saved color for current user, or use default
+            const savedColor = currentUsername ?
+                localStorage.getItem(`pigColor_${currentUsername}`) || 'pink' :
+                'pink';
+
+            window.pigSprite = new PigSprite(savedColor);
+        }
 
         // Add color picker to the UI
         function addColorPicker() {
