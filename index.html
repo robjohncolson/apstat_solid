@@ -1,0 +1,3873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AP Stats Consensus Quiz</title>
+    
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+    <script src="js/charts.js"></script>
+
+</head>
+<body>
+    <div class="container">
+        <h1>🧮 AP Statistics Consensus Quiz</h1>
+        <div id="messageArea"></div>
+        <div id="questionsContainer"></div>
+    </div>
+
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+<script src="data/curriculum.js"></script>
+    <script src="data/units.js"></script>
+    <script>
+      
+        // Helper functions for charts
+        function generateChartColors(count) {
+            const colors = [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+            ];
+            const result = [];
+            for (let i = 0; i < count; i++) {
+                result.push(colors[i % colors.length]);
+            }
+            return result;
+        }
+
+        function isDarkMode() {
+            return document.body.classList.contains('dark-theme');
+        }
+
+        function getTextColor() {
+            return isDarkMode() ? '#e0e0e0' : '#333333';
+        }
+
+        function getGridColor() {
+            return isDarkMode() ? '#444444' : '#e0e0e0';
+        }
+
+        function getScatterPointColor() {
+            return isDarkMode() ? '#5BC0EB' : '#36A2EB';
+        }
+
+        // Username Generation
+        const fruits = ['Apple', 'Banana', 'Cherry', 'Grape', 'Lemon', 'Mango', 'Orange', 'Peach', 'Pear', 'Plum', 'Berry', 'Melon', 'Kiwi', 'Lime', 'Papaya', 'Guava', 'Apricot', 'Date', 'Fig', 'Coconut'];
+        const animals = ['Bear', 'Cat', 'Dog', 'Eagle', 'Fox', 'Goat', 'Horse', 'Iguana', 'Jaguar', 'Koala', 'Lion', 'Monkey', 'Newt', 'Owl', 'Panda', 'Quail', 'Rabbit', 'Snake', 'Tiger', 'Wolf'];
+
+        function generateRandomUsername() {
+            const fruit = fruits[Math.floor(Math.random() * fruits.length)];
+            const animal = animals[Math.floor(Math.random() * animals.length)];
+            return `${fruit}_${animal}`;
+        }
+
+        // Global variables
+        let currentUsername = null;
+        let classData = null;
+        let currentUnit = null;
+        let currentLesson = null;
+        let currentQuestions = [];
+        let allUnitQuestions = [];
+        let chartInstances = {};
+        let currentTheme = 'light';
+
+        // Add this to your global variables
+        let allCurriculumData = {}; // Store all units' data
+
+
+        // Unit structure - defines lessons per unit
+        const unitStructure = {
+            1: { name: 'Exploring One-Variable Data', lessons: 5 },
+            2: { name: 'Exploring Two-Variable Data', lessons: 4 },
+            3: { name: 'Collecting Data', lessons: 3 },
+            4: { name: 'Probability & Random Variables', lessons: 5 },
+            5: { name: 'Sampling Distributions', lessons: 4 },
+            6: { name: 'Inference for Proportions', lessons: 4 },
+            7: { name: 'Inference for Means', lessons: 4 },
+            8: { name: 'Chi-Square Tests', lessons: 2 },
+            9: { name: 'Inference for Slopes', lessons: 2 }
+        };
+
+        // Initialize class data
+        function initClassData() {
+            let classDataStr = localStorage.getItem('classData');
+            classData = classDataStr ? JSON.parse(classDataStr) : {users: {}};
+
+            if (!classData.users[currentUsername]) {
+                classData.users[currentUsername] = {
+                    answers: {},
+                    reasons: {},
+                    timestamps: {},
+                    attempts: {}
+                };
+            }
+
+            saveClassData();
+        }
+
+        function saveClassData() {
+            try {
+                localStorage.setItem('classData', JSON.stringify(classData));
+            } catch(e) {
+                console.log("Storage quota exceeded");
+                showMessage("Warning: Local storage is full. Some data may not be saved.", 'error');
+            }
+        }
+
+        // Student Performance Badges
+        function calculateBadges(username) {
+            const userAnswers = classData.users[username]?.answers || {};
+            const userReasons = classData.users[username]?.reasons || {};
+            const userAttempts = classData.users[username]?.attempts || {};
+
+            const totalAnswers = Object.keys(userAnswers).length;
+            if (totalAnswers === 0) return [];
+
+            const badges = [];
+
+            // Calculate outlier/conformist
+            let modeMatches = 0;
+            let outlierCount = 0;
+
+            Object.keys(userAnswers).forEach(qId => {
+                const allAnswers = Object.values(classData.users)
+                    .map(u => u.answers?.[qId]?.value || u.answers?.[qId])
+                    .filter(a => a);
+
+                if (allAnswers.length > 1) {
+                    const mode = getMostFrequent(allAnswers);
+                    const userAnswer = userAnswers[qId]?.value || userAnswers[qId];
+                    if (userAnswer === mode) modeMatches++;
+                    else outlierCount++;
+                }
+            });
+
+            if (outlierCount > totalAnswers * 0.5) badges.push('🎯 Outlier');
+            if (modeMatches > totalAnswers * 0.8) badges.push('👥 Conformist');
+
+            // Explorer badge
+            const multiAttempts = Object.values(userAttempts).filter(a => a >= 2).length;
+            if (multiAttempts > totalAnswers * 0.3) badges.push('🔄 Explorer');
+
+            // Silent type vs Debater
+            const reasonCount = Object.values(userReasons).filter(r => r && r.trim()).length;
+            if (reasonCount < totalAnswers * 0.2) badges.push('🤐 Silent Type');
+            else if (reasonCount > totalAnswers * 0.8) badges.push('💬 Debater');
+
+            // Completionist
+            const totalQuestions = currentQuestions.length;
+            if (totalAnswers === totalQuestions && totalQuestions > 0) badges.push('✅ Completionist');
+
+            return badges;
+        }
+
+        function getMostFrequent(arr) {
+            const counts = {};
+            arr.forEach(x => counts[x] = (counts[x] || 0) + 1);
+            return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        }
+
+        // Check if question has been answered
+        function isQuestionAnswered(questionId) {
+            return classData.users[currentUsername]?.answers?.[questionId] !== undefined;
+        }
+
+        // Get attempt count for a question
+        function getAttemptCount(questionId) {
+            return classData.users[currentUsername]?.attempts?.[questionId] || 0;
+        }
+
+        // Check if can retry (has reason in previous attempt and < 3 attempts)
+        function canRetry(questionId) {
+            const attempts = getAttemptCount(questionId);
+            if (attempts >= 3) return false;
+            if (attempts === 0) return true;
+            
+            // Check if previous attempt had a reason
+            const previousReason = classData.users[currentUsername]?.reasons?.[questionId];
+            return previousReason && previousReason.trim().length > 0;
+        }
+        // Replace the entire detectUnitAndLessons function:
+        function detectUnitAndLessons(questions) {
+            if (!questions || questions.length === 0) return null;
+
+            const firstId = questions[0].id;
+            const unitMatch = firstId.match(/U(\d+)/i);
+            if (!unitMatch) return null;
+
+            const unitNum = parseInt(unitMatch[1]);
+
+            // Group questions by lesson
+            const lessonGroups = {};
+            questions.forEach(q => {
+                let lessonIdentifier;
+
+                // Check for Progress Check questions first
+                if (q.id.includes('-PC-')) {
+                    lessonIdentifier = 'PC';
+                } else {
+                    // Match standard lesson format: U#-L#-
+                    const lessonMatch = q.id.match(/U\d+-L(\d+)-/);
+                    if (lessonMatch) {
+                        lessonIdentifier = parseInt(lessonMatch[1]);
+                    }
+                }
+
+                if (lessonIdentifier !== undefined) {
+                    if (!lessonGroups[lessonIdentifier]) {
+                        lessonGroups[lessonIdentifier] = [];
+                    }
+                    lessonGroups[lessonIdentifier].push(q);
+                }
+            });
+
+            // Sort lesson numbers properly, with PC at the end
+            const numericLessons = Object.keys(lessonGroups)
+                .filter(key => typeof key === 'number' || !isNaN(key))
+                .map(n => parseInt(n))
+                .sort((a, b) => a - b);
+
+            const allLessons = numericLessons.concat(lessonGroups['PC'] ? ['PC'] : []);
+
+            console.log('Detected lessons:', allLessons); // Debug log
+            console.log('Lesson groups:', Object.keys(lessonGroups)); // Debug log
+
+            return {
+                unitNumber: unitNum,
+                lessons: lessonGroups,
+                lessonNumbers: allLessons
+            };
+        }
+
+
+       
+
+
+
+        // Username management
+        function promptUsername() {
+            const savedUsername = localStorage.getItem('consensusUsername');
+            if (savedUsername) {
+                currentUsername = savedUsername;
+                initClassData();
+                showUsernameWelcome();
+                initializeFromEmbeddedData(); // Initialize from embedded data
+            } else {
+                showUsernamePrompt();
+            }
+        }
+
+        function showUsernamePrompt() {
+            const suggestedName = generateRandomUsername();
+            const questionsContainer = document.getElementById('questionsContainer');
+            questionsContainer.innerHTML = `
+                <div class="username-prompt-enhanced">
+                    <div class="welcome-header">
+                        <h1>📊 AP Statistics Consensus Quiz</h1>
+                        <p class="subtitle">Collaborative Learning Platform</p>
+                    </div>
+
+                    <!-- Returning User Section -->
+                    <div class="user-section returning-user">
+                        <h2>🔄 Returning Student?</h2>
+                        <p>Recover your existing username using one of these methods:</p>
+
+                        <div class="recovery-options">
+                            <!-- Manual Entry -->
+                            <div class="recovery-option">
+                                <div class="option-icon">✏️</div>
+                                <h3>Enter Username</h3>
+                                <input type="text"
+                                       id="manualUsername"
+                                       placeholder="e.g., Apple_Bear"
+                                       class="username-input"
+                                       onkeypress="if(event.key==='Enter') recoverUsername()">
+                                <button onclick="recoverUsername()" class="action-button primary">
+                                    Use This Username
+                                </button>
+                            </div>
+
+                            <!-- File Import -->
+                            <div class="recovery-option">
+                                <div class="option-icon">📁</div>
+                                <h3>Import from Backup</h3>
+                                <p class="option-description">Load your username from a previous export</p>
+                                <input type="file"
+                                       id="usernameImportFile"
+                                       accept=".json"
+                                       style="display: none;"
+                                       onchange="importUsernameFromFile(event)">
+                                <button onclick="document.getElementById('usernameImportFile').click()"
+                                        class="action-button secondary">
+                                    Choose File
+                                </button>
+                            </div>
+
+                            <!-- QR Code -->
+                            <div class="recovery-option">
+                                <div class="option-icon">📱</div>
+                                <h3>Scan QR Code</h3>
+                                <p class="option-description">Scan your username QR code</p>
+                                <button onclick="showQRScanner()" class="action-button secondary">
+                                    Open Scanner
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Recently Used Usernames (if any in localStorage) -->
+                        <div id="recentUsernames" style="display: none;">
+                            <h3>📝 Recently Used on This Device:</h3>
+                            <div id="recentUsernamesList"></div>
+                        </div>
+                    </div>
+
+                    <!-- New User Section -->
+                    <div class="user-section new-user">
+                        <h2>🆕 New Student?</h2>
+                        <p>Generate a unique username to get started:</p>
+
+                        <div class="name-generator">
+                            <div class="generated-name-display">
+                                <span class="name-label">Your Username:</span>
+                                <span class="generated-name" id="generatedName">${suggestedName}</span>
+                            </div>
+
+                            <div class="generator-buttons">
+                                <button onclick="acceptUsername('${suggestedName}')" class="action-button primary large">
+                                    <span class="button-icon">✅</span>
+                                    Accept & Start
+                                </button>
+                                <button onclick="rerollUsername()" class="action-button secondary">
+                                    <span class="button-icon">🎲</span>
+                                    Generate New
+                                </button>
+                            </div>
+
+                            <div class="name-explanation">
+                                <small>💡 Tip: Write down your username or export it for future use!</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QR Scanner Modal (hidden by default) -->
+                    <div id="qrScannerModal" class="modal" style="display: none;">
+                        <div class="modal-content qr-scanner">
+                            <span class="close-modal" onclick="closeQRScanner()">&times;</span>
+                            <h3>Scan Username QR Code</h3>
+                            <div id="qrReader"></div>
+                            <input type="text"
+                                   id="qrManualInput"
+                                   placeholder="Or enter code manually"
+                                   class="username-input">
+                            <button onclick="processQRCode()" class="action-button primary">
+                                Submit Code
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Check for recently used usernames
+            loadRecentUsernames();
+        }
+
+        window.rerollUsername = function() {
+            const newName = generateRandomUsername();
+            const generatedNameElement = document.getElementById('generatedName');
+            if (generatedNameElement) {
+                generatedNameElement.textContent = newName;
+                // Update the accept button to use the new name
+                const acceptButton = generatedNameElement.closest('.name-generator').querySelector('.action-button.primary.large');
+                if (acceptButton) {
+                    acceptButton.onclick = () => acceptUsername(newName);
+                }
+            } else {
+                // Fallback to full refresh if element not found
+                showUsernamePrompt();
+            }
+        }
+
+        window.acceptUsername = function(name) {
+            currentUsername = name;
+            localStorage.setItem('consensusUsername', currentUsername);
+            initClassData();
+            showUsernameWelcome();
+            initializeFromEmbeddedData();
+        }
+
+        // Function to recover username from manual input
+        window.recoverUsername = function() {
+            const input = document.getElementById('manualUsername');
+            const username = input.value.trim();
+
+            if (!username) {
+                showMessage('Please enter a username', 'error');
+                return;
+            }
+
+            // Validate username format (optional)
+            if (!username.match(/^[A-Za-z]+_[A-Za-z]+$/)) {
+                if (!confirm('This username doesn\'t match the standard format (Fruit_Animal). Use it anyway?')) {
+                    return;
+                }
+            }
+
+            // Check if this username has existing data
+            checkExistingData(username);
+        }
+
+        // Function to check for existing data
+        function checkExistingData(username) {
+            const existingData = localStorage.getItem(`answers_${username}`);
+            const classData = JSON.parse(localStorage.getItem('classData') || '{}');
+            const hasData = existingData || (classData.users && classData.users[username]);
+
+            if (hasData) {
+                if (confirm(`Found existing data for ${username}. Would you like to continue with this username and restore your progress?`)) {
+                    acceptUsername(username);
+                    showMessage('Welcome back! Your progress has been restored.', 'success');
+                }
+            } else {
+                if (confirm(`No existing data found for ${username}. Would you like to start fresh with this username?`)) {
+                    acceptUsername(username);
+                    showMessage('Username set! Starting fresh.', 'info');
+                }
+            }
+        }
+
+        // Function to import username from file
+        window.importUsernameFromFile = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+
+                    // Try to find username in various formats
+                    let username = null;
+
+                    // Check for direct username field
+                    if (data.username) {
+                        username = data.username;
+                    }
+                    // Check for export format
+                    else if (data.exportTime && data.users) {
+                        const usernames = Object.keys(data.users);
+                        if (usernames.length === 1) {
+                            username = usernames[0];
+                        } else if (usernames.length > 1) {
+                            // Show selection dialog
+                            showUsernameSelection(usernames);
+                            return;
+                        }
+                    }
+                    // Check for class data format
+                    else if (data.users) {
+                        const usernames = Object.keys(data.users);
+                        if (usernames.length > 0) {
+                            showUsernameSelection(usernames);
+                            return;
+                        }
+                    }
+
+                    if (username) {
+                        checkExistingData(username);
+                    } else {
+                        showMessage('No username found in this file', 'error');
+                    }
+
+                } catch (error) {
+                    showMessage('Invalid file format', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Function to show username selection dialog
+        function showUsernameSelection(usernames) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+
+            let optionsHTML = usernames.map(u =>
+                `<button onclick="selectUsername('${u}')" class="username-option">
+                    ${u}
+                </button>`
+            ).join('');
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close-modal" onclick="this.parentElement.parentElement.remove()">&times;</span>
+                    <h3>Select Your Username</h3>
+                    <p>Multiple usernames found. Please select yours:</p>
+                    <div class="username-options">
+                        ${optionsHTML}
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        }
+
+        window.selectUsername = function(username) {
+            document.querySelector('.modal').remove();
+            checkExistingData(username);
+        }
+
+        // Function to load recently used usernames
+        function loadRecentUsernames() {
+            const recentUsers = [];
+
+            // Check localStorage for any stored usernames
+            for (let key in localStorage) {
+                if (key.startsWith('answers_')) {
+                    const username = key.replace('answers_', '');
+                    if (username && username !== 'undefined') {
+                        recentUsers.push(username);
+                    }
+                }
+            }
+
+            // Also check class data
+            const classData = JSON.parse(localStorage.getItem('classData') || '{}');
+            if (classData.users) {
+                Object.keys(classData.users).forEach(u => {
+                    if (!recentUsers.includes(u)) {
+                        recentUsers.push(u);
+                    }
+                });
+            }
+
+            // Display recent usernames if any found
+            if (recentUsers.length > 0) {
+                const container = document.getElementById('recentUsernames');
+                const list = document.getElementById('recentUsernamesList');
+
+                container.style.display = 'block';
+                list.innerHTML = recentUsers.map(u => `
+                    <button onclick="checkExistingData('${u}')" class="recent-username-btn">
+                        ${u}
+                    </button>
+                `).join('');
+            }
+        }
+
+        // QR Code Functions
+        window.showQRScanner = function() {
+            document.getElementById('qrScannerModal').style.display = 'block';
+            // Note: Actual QR scanning would require a library like qr-scanner.js
+            showMessage('QR Scanner opened. You can also enter the code manually.', 'info');
+        }
+
+        window.closeQRScanner = function() {
+            document.getElementById('qrScannerModal').style.display = 'none';
+        }
+
+        window.processQRCode = function() {
+            const input = document.getElementById('qrManualInput');
+            const code = input.value.trim();
+
+            if (code) {
+                // Process QR code (could be username or encoded data)
+                if (code.startsWith('APStats:')) {
+                    const username = code.replace('APStats:', '');
+                    checkExistingData(username);
+                    closeQRScanner();
+                } else {
+                    checkExistingData(code);
+                    closeQRScanner();
+                }
+            }
+        }
+
+        // Add function to generate QR code for current user
+        window.generateUsernameQR = function() {
+            if (!currentUsername) return;
+
+            // Create a simple text representation
+            const qrData = `APStats:${currentUsername}`;
+
+            // In real implementation, use QR code library
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close-modal" onclick="this.parentElement.parentElement.remove()">&times;</span>
+                    <h3>Your Username QR Code</h3>
+                    <div class="qr-display">
+                        <div class="qr-placeholder">
+                            <p>QR Code for:</p>
+                            <h2>${currentUsername}</h2>
+                            <p class="qr-code-text">Code: APStats:${currentUsername}</p>
+                        </div>
+                        <button onclick="copyUsernameCode('APStats:${currentUsername}')" class="action-button primary">
+                            Copy Code
+                        </button>
+                        <p><small>Save this code or QR image to recover your username later</small></p>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        }
+
+        window.copyUsernameCode = function(code) {
+            navigator.clipboard.writeText(code).then(() => {
+                showMessage('Code copied to clipboard!', 'success');
+            });
+        }
+
+        // Enhanced acceptUsername to save to recent list
+        const originalAcceptUsername = window.acceptUsername;
+        window.acceptUsername = function(name) {
+            // Save to recent usernames list
+            let recentUsernames = JSON.parse(localStorage.getItem('recentUsernames') || '[]');
+            if (!recentUsernames.includes(name)) {
+                recentUsernames.unshift(name);
+                // Keep only last 5 usernames
+                recentUsernames = recentUsernames.slice(0, 5);
+                localStorage.setItem('recentUsernames', JSON.stringify(recentUsernames));
+            }
+
+            // Call original function
+            originalAcceptUsername(name);
+        }
+
+        // Function to export username with a simple format
+        window.exportUsername = function() {
+            if (!currentUsername) {
+                showMessage('No username to export', 'error');
+                return;
+            }
+
+            const exportData = {
+                username: currentUsername,
+                exportDate: new Date().toISOString(),
+                version: '1.0',
+                qrCode: `APStats:${currentUsername}`
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentUsername}_identity.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showMessage('Username exported successfully!', 'success');
+        }
+
+        function showUsernameWelcome() {
+            const container = document.querySelector('.container');
+            if (!container) return;
+            const existingWelcome = document.querySelector('.username-welcome');
+            if (existingWelcome) existingWelcome.remove();
+
+            const welcomeDiv = document.createElement('div');
+            welcomeDiv.className = 'username-welcome';
+            welcomeDiv.textContent = `Welcome ${currentUsername}!`;
+            container.insertBefore(welcomeDiv, container.firstChild.nextSibling);
+        }
+
+        function initializeFromEmbeddedData() {
+            // Parse embedded curriculum
+            allCurriculumData = {};
+            const allQuestions = EMBEDDED_CURRICULUM.questions || EMBEDDED_CURRICULUM;
+
+            // Group by units
+            const unitGroups = {};
+            allQuestions.forEach(question => {
+                const unitMatch = question.id.match(/U(\d+)/i);
+                if (unitMatch) {
+                    const unitNum = parseInt(unitMatch[1]);
+                    if (!unitGroups[unitNum]) {
+                        unitGroups[unitNum] = [];
+                    }
+                    unitGroups[unitNum].push(question);
+                }
+            });
+
+            // Process each unit
+            Object.keys(unitGroups).forEach(unitNum => {
+                const unitQuestions = unitGroups[unitNum];
+                const unitInfo = detectUnitAndLessons(unitQuestions);
+                if (unitInfo) {
+                    allCurriculumData[unitNum] = {
+                        questions: unitQuestions,
+                        unitInfo: unitInfo,
+                        fileName: `Unit ${unitNum}`
+                    };
+                }
+            });
+
+            // Go straight to unit menu
+            renderUnitMenu();
+        }
+
+        // Unit selector - REMOVED: No longer needed due to CORS issues
+        // function renderUnitSelector() {
+        //     const questionsContainer = document.getElementById('questionsContainer');
+        //     let buttonsHtml = '';
+        //
+        //     for (let unitNum in unitStructure) {
+        //         const unit = unitStructure[unitNum];
+        //         buttonsHtml += `
+        //             <button onclick="loadUnit(${unitNum})" class="unit-btn" id="unit-btn-${unitNum}">
+        //                 <strong>Unit ${unitNum}</strong><br>
+        //                 ${unit.name}
+        //             </button>
+        //         `;
+        //     }
+        //
+        //     questionsContainer.innerHTML = `
+        //         <div class="unit-selector">
+        //             <h2>Select a Unit</h2>
+        //             <div class="unit-buttons">
+        //                 ${buttonsHtml}
+        //             </div>
+        //         </div>
+        //     `;
+        // }
+
+        // Load unit
+        window.loadUnit = async function(unitNumber) {
+            const btn = document.getElementById(`unit-btn-${unitNumber}`);
+            if (btn) {
+                btn.classList.add('loading');
+                btn.disabled = true;
+            }
+
+            try {
+                const response = await fetch(`unit${unitNumber}.json`);
+                if (!response.ok) {
+                    throw new Error(`Unit ${unitNumber} file not found`);
+                }
+                const data = await response.json();
+                currentUnit = unitNumber;
+                allUnitQuestions = Array.isArray(data) ? data : (data.questions || []);
+                
+                renderLessonSelector();
+                showMessage(`Unit ${unitNumber} loaded successfully!`, 'success');
+            } catch (error) {
+                showMessage(`Error loading Unit ${unitNumber}: ${error.message}`, 'error');
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        // Render lesson selector
+function renderLessonSelector(unitInfo) {
+    const questionsContainer = document.getElementById('questionsContainer');
+    
+    // If unitInfo provided (from file load), use it
+    if (unitInfo && unitInfo.lessonNumbers) {
+        let lessonButtonsHtml = '';
+        
+        unitInfo.lessonNumbers.forEach(lessonNum => {
+            const questions = unitInfo.lessons[lessonNum];
+            const isCompleted = questions.every(q => isQuestionAnswered(q.id));
+            const displayName = lessonNum === 'PC' ? 'Progress Check' : `Lesson ${lessonNum}`;
+            const buttonId = lessonNum === 'PC' ? 'lesson-btn-PC' : `lesson-btn-${lessonNum}`;
+
+            lessonButtonsHtml += `
+                <button onclick="loadLesson('${lessonNum}')"
+                        class="lesson-btn ${isCompleted ? 'completed' : ''}"
+                        id="${buttonId}">
+                    ${displayName}<br>
+                    <small>${questions.length} questions</small>
+                </button>
+            `;
+        });
+        
+        questionsContainer.innerHTML = `
+            <button onclick="backToUnits()" class="back-button">← Back to Units</button>
+            <div class="lesson-selector">
+                <h3>Unit ${currentUnit}: ${unitStructure[currentUnit]?.name || 'Unknown Unit'}</h3>
+                <p>Select a lesson to begin:</p>
+                <div class="lesson-buttons">
+                    ${lessonButtonsHtml}
+                </div>
+            </div>
+        <div class="app-controls">
+            <button id="syncBtn" class="control-btn">
+                <i class="fas fa-sync"></i>
+                Sync
+            </button>
+            <input type="file" id="importFile" accept=".json" style="display: none;">
+        </div>
+        <!-- Sync Modal -->
+        <div id="syncModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Sync Options</h2>
+                <div class="sync-buttons">
+                    <button id="exportBtn" class="modal-btn">
+                        <i class="fas fa-download"></i>
+                        Export
+                    </button>
+                    <button id="importBtn" class="modal-btn">
+                        <i class="fas fa-upload"></i>
+                        Import
+                    </button>
+                    <button id="totalExportBtn" class="modal-btn">
+                        <i class="fas fa-database"></i>
+                        Total Export
+                    </button>
+                </div>
+            </div>
+        </div>
+        `;
+        return;
+    }
+    
+    // Old fallback code for when called without unitInfo
+    const unit = unitStructure[currentUnit];
+    if (!unit) return;
+    
+    let lessonButtonsHtml = '';
+    
+    // Group questions by lesson
+    const lessonGroups = {};
+    allUnitQuestions.forEach(q => {
+        const match = q.id.match(/L(\d+)/);
+        if (match) {
+            const lessonNum = parseInt(match[1]);
+            if (!lessonGroups[lessonNum]) {
+                lessonGroups[lessonNum] = [];
+            }
+            lessonGroups[lessonNum].push(q);
+        }
+    });
+    
+    for (let i = 1; i <= unit.lessons; i++) {
+        const questionCount = lessonGroups[i] ? lessonGroups[i].length : 0;
+        const isCompleted = checkLessonCompleted(currentUnit, i);
+        lessonButtonsHtml += `
+            <button onclick="loadLesson(${i})" class="lesson-btn ${isCompleted ? 'completed' : ''}" id="lesson-btn-${i}">
+                Lesson ${i}<br>
+                <small>${questionCount} questions</small>
+            </button>
+        `;
+    }
+    
+    questionsContainer.innerHTML = `
+        <button onclick="backToUnits()" class="back-button">← Back to Units</button>
+        <div class="lesson-selector">
+            <h3>Unit ${currentUnit}: ${unit.name}</h3>
+            <p>Select a lesson to begin:</p>
+            <div class="lesson-buttons">
+                ${lessonButtonsHtml}
+            </div>
+        </div>
+        <div class="app-controls">
+            <button id="syncBtn" class="control-btn">
+                <i class="fas fa-sync"></i>
+                Sync
+            </button>
+            <input type="file" id="importFile" accept=".json" style="display: none;">
+        </div>
+
+        <!-- Enhanced Sync Modal with Cloud Integration -->
+        <div id="syncModal" class="modal" style="display: none;">
+            <div class="modal-content enhanced-sync-modal">
+                <span class="close-modal">&times;</span>
+                <h2><i class="fas fa-sync"></i> Sync & Backup Options</h2>
+
+                <!-- Tab Navigation -->
+                <div class="sync-tabs">
+                    <button class="sync-tab active" data-tab="local">
+                        <i class="fas fa-hdd"></i> Local Sync
+                    </button>
+                    <button class="sync-tab" data-tab="cloud">
+                        <i class="fas fa-cloud"></i> Cloud Sync
+                    </button>
+                </div>
+
+                <!-- Local Sync Tab -->
+                <div class="sync-tab-content active" id="localSyncTab">
+                    <div class="sync-section-header">
+                        <h3>Local File Operations</h3>
+                        <p>Export and import quiz data using JSON files</p>
+                    </div>
+
+                    <div class="sync-buttons">
+                        <button id="exportBtn" class="modal-btn">
+                            <i class="fas fa-download"></i>
+                            <span>
+                                <strong>Export My Data</strong>
+                                <small>Save your personal quiz data</small>
+                            </span>
+                        </button>
+                        <button id="importBtn" class="modal-btn">
+                            <i class="fas fa-upload"></i>
+                            <span>
+                                <strong>Import Data</strong>
+                                <small>Load quiz data from file</small>
+                            </span>
+                        </button>
+                        <button id="totalExportBtn" class="modal-btn">
+                            <i class="fas fa-database"></i>
+                            <span>
+                                <strong>Total Export</strong>
+                                <small>Export all users' data (master)</small>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cloud Sync Tab -->
+                <div class="sync-tab-content" id="cloudSyncTab">
+                    <div class="sync-section-header">
+                        <h3>Cloud Synchronization</h3>
+                        <p>Sync your data across devices instantly</p>
+                    </div>
+
+                    <!-- Cloud Sync Status -->
+                    <div class="cloud-sync-status">
+                        <div class="sync-status-row">
+                            <span class="status-label">Last Sync:</span>
+                            <span class="status-value" id="lastSyncTime">Never</span>
+                        </div>
+                        <div class="sync-status-row">
+                            <span class="status-label">Auto-Sync:</span>
+                            <span class="status-value">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="autoSyncToggle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span id="autoSyncStatus">OFF</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Cloud Sync Actions -->
+                    <div class="sync-buttons cloud-buttons">
+                        <button id="pushToCloudBtn" class="modal-btn cloud-btn">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>
+                                <strong>Push to Cloud</strong>
+                                <small>Upload local changes</small>
+                            </span>
+                        </button>
+                        <button id="pullFromCloudBtn" class="modal-btn cloud-btn">
+                            <i class="fas fa-cloud-download-alt"></i>
+                            <span>
+                                <strong>Pull from Cloud</strong>
+                                <small>Download latest data</small>
+                            </span>
+                        </button>
+                        <button id="syncBothWaysBtn" class="modal-btn cloud-btn primary">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>
+                                <strong>Two-Way Sync</strong>
+                                <small>Merge local and cloud data</small>
+                            </span>
+                        </button>
+                    </div>
+
+                    <!-- Cloud Sync Stats -->
+                    <div class="cloud-sync-stats">
+                        <div class="stat-item">
+                            <i class="fas fa-desktop"></i>
+                            <div>
+                                <strong id="localRecordCount">0</strong>
+                                <small>Local Records</small>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-cloud"></i>
+                            <div>
+                                <strong id="cloudRecordCount">0</strong>
+                                <small>Cloud Records</small>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-users"></i>
+                            <div>
+                                <strong id="totalUserCount">0</strong>
+                                <small>Total Users</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+        // Check if lesson is completed
+        function checkLessonCompleted(unitNum, lessonNum) {
+            const lessonQuestions = allUnitQuestions.filter(q => {
+                const match = q.id.match(/L(\d+)/);
+                return match && parseInt(match[1]) === lessonNum;
+            });
+            
+            if (lessonQuestions.length === 0) return false;
+            
+            return lessonQuestions.every(q => isQuestionAnswered(q.id));
+        }
+
+        // Load lesson
+        window.loadLesson = function(lessonNumber) {
+            currentLesson = lessonNumber;
+
+            // Handle both numeric lessons and 'PC'
+            if (lessonNumber === 'PC') {
+                currentQuestions = allUnitQuestions.filter(q => q.id.includes('-PC-'));
+            } else {
+                const lessonNum = parseInt(lessonNumber);
+                currentQuestions = allUnitQuestions.filter(q => {
+                    if (q.id.includes('-PC-')) return false; // Exclude PC questions
+                    const match = q.id.match(/U\d+-L(\d+)-/);
+                    return match && parseInt(match[1]) === lessonNum;
+                });
+            }
+
+            if (currentQuestions.length === 0) {
+                showMessage(`No questions found for Lesson ${lessonNumber}`, 'error');
+                return;
+            }
+
+            console.log(`Loading lesson ${lessonNumber} with ${currentQuestions.length} questions`); // Debug
+            renderQuiz();
+        }
+
+        // Back to units
+        window.backToUnits = function() {
+            // Clear any existing charts
+            Object.values(chartInstances).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            });
+            chartInstances = {};
+            currentQuestions = [];
+            allUnitQuestions = [];
+            currentUnit = null;
+            currentLesson = null;
+
+            // Go to unit menu
+            renderUnitMenu();
+        }
+
+        // Back to lessons
+        window.backToLessons = function() {
+            // Clear any existing charts
+            Object.values(chartInstances).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            });
+            chartInstances = {};
+            currentQuestions = [];
+            currentLesson = null;
+
+            // Re-detect the unit structure from allUnitQuestions
+            const unitInfo = detectUnitAndLessons(allUnitQuestions);
+
+            // Call renderLessonSelector with the unitInfo
+            renderLessonSelector(unitInfo);
+        }
+
+        // Render quiz
+        function renderQuiz() {
+            const questionsContainer = document.getElementById('questionsContainer');
+            
+            questionsContainer.innerHTML = `
+                <button onclick="backToLessons()" class="back-button">← Back to Lessons</button>
+                <div class="app-controls">
+                    <div style="flex: 1;">
+                        <strong>Unit ${currentUnit}, Lesson ${currentLesson}</strong> - ${currentQuestions.length} questions
+                    </div>
+                    <button id="syncBtn" class="control-btn">
+                        <i class="fas fa-sync"></i>
+                        Sync
+                    </button>
+                    <input type="file" id="importFile" accept=".json" style="display: none;">
+                </div>
+
+                <!-- Sync Modal -->
+                <div id="syncModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <span class="close-modal">&times;</span>
+                        <h2>Sync Options</h2>
+                        <div class="sync-buttons">
+                            <button id="exportBtn" class="modal-btn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                            <button id="importBtn" class="modal-btn">
+                                <i class="fas fa-upload"></i>
+                                Import
+                            </button>
+                            <button id="totalExportBtn" class="modal-btn">
+                                <i class="fas fa-database"></i>
+                                Total Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="questions-list"></div>
+                <div class="loading-msg" id="loading-msg" style="display:none;">Loading questions...</div>
+            `;
+            
+            const questionsList = document.getElementById('questions-list');
+            
+            // Show loading message
+            document.getElementById('loading-msg').style.display = 'block';
+            
+            // Render all questions for the lesson with a small delay for animation
+            setTimeout(() => {
+                currentQuestions.forEach((question, index) => {
+                    const questionHtml = renderQuestion(question, index);
+                    questionsList.insertAdjacentHTML('beforeend', questionHtml);
+                });
+                
+                document.getElementById('loading-msg').style.display = 'none';
+                
+                // Load saved progress
+                loadProgress();
+                
+                // Render MathJax
+                if (window.MathJax) {
+                    MathJax.typesetPromise().catch(e => console.log('MathJax error:', e));
+                }
+                
+                // Render charts for visible questions
+                setTimeout(renderVisibleCharts, 100);
+            }, 100);
+        }
+
+        // Render question
+        function renderQuestion(question, index) {
+            const questionNumber = index + 1;
+            const isAnswered = isQuestionAnswered(question.id);
+            const attempts = getAttemptCount(question.id);
+            const canRetryQuestion = canRetry(question.id);
+            
+            let html = `
+                <div class="quiz-container" data-question-id="${question.id}" data-question-number="${questionNumber}">
+                    <div class="question-header">
+                        <span>Question ${questionNumber}</span>
+                        ${isAnswered ? '<span style="color: #a5d6a7;">✓ Answered</span>' : ''}
+                    </div>
+                    <div class="question-id">ID: ${question.id || 'N/A'}</div>
+                    <div class="question-prompt">${question.prompt || 'No prompt provided'}</div>
+            `;
+
+            // Render attachments if present
+            if (question.attachments) {
+                html += renderAttachments(question.attachments, question.id);
+            }
+
+            // Handle MCQ
+            if (question.type === 'multiple-choice') {
+                const choices = question.choices || question.attachments?.choices || [];
+                const savedAnswer = classData.users[currentUsername]?.answers?.[question.id];
+                const isDisabled = isAnswered && !canRetryQuestion;
+                
+                html += '<div class="choices">';
+                choices.forEach(choice => {
+                    const isSelected = savedAnswer?.value === choice.key || savedAnswer === choice.key;
+                    html += `
+                        <div class="choice ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}">
+                            <label>
+                                <input type="radio" 
+                                       name="choice-${question.id}" 
+                                       value="${choice.key}"
+                                       ${isSelected ? 'checked' : ''}
+                                       ${isDisabled ? 'disabled' : ''}>
+                                <span class="choice-key">${choice.key}.</span>
+                                <span>${choice.value}</span>
+                            </label>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            // Handle FRQ
+            if (question.type === 'free-response') {
+                const savedAnswer = classData.users[currentUsername]?.answers?.[question.id];
+                const isDisabled = isAnswered && !canRetryQuestion;
+                html += `
+                    <div class="answer-section">
+                        <textarea
+                            id="frq-${question.id}"
+                            class="frq-textarea"
+                            placeholder="Enter your complete response here..."
+                            ${isDisabled ? 'disabled' : ''}
+                            style="width: 100%; min-height: 200px; padding: 10px; border: 2px solid #ddd;"
+                        >${savedAnswer?.value || savedAnswer || ''}</textarea>
+                    </div>
+                `;
+            }
+
+            // Add answer section
+            html += `
+                <div class="answer-section">
+                    <div class="reason-wrapper">
+                        <label class="reason-label">
+                            ${attempts > 0 && !canRetryQuestion ? 
+                                'Your explanation (required for retry):' : 
+                                'Explain your reasoning (optional but enables retry):'}
+                        </label>
+                        <textarea 
+                            id="reason-${question.id}"
+                            class="reason-textarea ${attempts > 0 && canRetryQuestion ? 'required' : ''}"
+                            placeholder="${attempts > 0 && !canRetryQuestion ? 
+                                'Previous attempt did not include reasoning. Add reasoning to enable retry.' : 
+                                'Explain why you chose this answer...'}"
+                            ${!canRetryQuestion && attempts >= 3 ? 'disabled' : ''}
+                        >${classData.users[currentUsername]?.reasons?.[question.id] || ''}</textarea>
+                    </div>
+                    <div>
+                        <button 
+                            id="submit-${question.id}"
+                            class="submit-button" 
+                            onclick="submitAnswer('${question.id}', '${question.type}')"
+                            ${!canRetryQuestion && isAnswered ? 'disabled' : ''}
+                        >
+                            ${isAnswered ? (canRetryQuestion ? 'Update Answer' : 'Max Attempts Reached') : 'Submit Answer'}
+                        </button>
+                        <span id="error-${question.id}" class="error-msg"></span>
+                        <span id="success-${question.id}" class="success-msg"></span>
+                    </div>
+                </div>
+            `;
+
+            // Add dotplot section (always visible if answered)
+            if (isAnswered) {
+                html += `
+                    <div class="dotplot-section show" id="dotplot-section-${question.id}">
+                        <canvas id="dotplot-${question.id}" width="400" height="200"></canvas>
+                        <div id="consensus-${question.id}"></div>
+                        <div class="contributors-list" id="contributors-${question.id}"></div>
+                    </div>
+                `;
+            } else {
+                html += `<div class="dotplot-section" id="dotplot-section-${question.id}"></div>`;
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        // Render attachments (charts, tables, images)
+        function renderAttachments(attachments, questionId) {
+            let html = '';
+            
+            // Handle charts
+            if (attachments.chartType) {
+                html += renderChart(attachments, questionId);
+            }
+            
+            // Handle tables
+            if (attachments.table) {
+                html += renderTable(attachments.table);
+            }
+            
+            // Handle images
+            if (attachments.image) {
+                html += `
+                    <div class="image-container">
+                        <img src="${attachments.image}" alt="Question image" style="max-width: 100%; height: auto;">
+                    </div>
+                `;
+            }
+            
+            return html;
+        }
+        
+        // Render chart placeholder (actual rendering happens later)
+          // FIXED: Table rendering to handle both object and array formats
+          function renderTable(table) {
+              if (!table) return '';
+
+              let tableHtml = '<div class="table-container"><table>';
+
+              // Handle object format (with headers and rows properties)
+              if (table.headers && table.rows) {
+                  // Render headers
+                  tableHtml += '<thead><tr>';
+                  table.headers.forEach(header => {
+                      tableHtml += `<th>${header}</th>`;
+                  });
+                  tableHtml += '</tr></thead>';
+
+                  // Render rows
+                  if (table.rows && table.rows.length > 0) {
+                      tableHtml += '<tbody>';
+                      table.rows.forEach(row => {
+                          tableHtml += '<tr>';
+                          row.forEach(cell => {
+                              tableHtml += `<td>${cell}</td>`;
+                          });
+                          tableHtml += '</tr>';
+                      });
+                      tableHtml += '</tbody>';
+                  }
+              }
+              // Handle array format (legacy)
+              else if (Array.isArray(table) && table.length > 0) {
+                  const headers = table[0];
+                  const rows = table.slice(1);
+
+                  // Headers
+                  tableHtml += '<thead><tr>';
+                  headers.forEach(header => {
+                      tableHtml += `<th>${header}</th>`;
+                  });
+                  tableHtml += '</tr></thead>';
+
+                  // Rows
+                  if (rows.length > 0) {
+                      tableHtml += '<tbody>';
+                      rows.forEach(row => {
+                          tableHtml += '<tr>';
+                          row.forEach(cell => {
+                              tableHtml += `<td>${cell}</td>`;
+                          });
+                          tableHtml += '</tr>';
+                      });
+                      tableHtml += '</tbody>';
+                  }
+              }
+
+              tableHtml += '</table></div>';
+
+              return tableHtml;
+          }
+// Complete chart rendering function
+function renderChartNow(chartId) {
+    const canvas = document.getElementById(chartId);
+    if (!canvas) return;
+
+    // FIX: Check if chart already exists and destroy it
+    if (chartInstances[chartId]) {
+        chartInstances[chartId].destroy();
+        delete chartInstances[chartId];
+    }
+
+    const chartData = window.pendingCharts[chartId];
+    if (!chartData) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // FIX: Set canvas parent height to prevent infinite expansion
+    canvas.parentElement.style.height = '400px';
+    canvas.parentElement.style.position = 'relative';
+
+    const config = chartData.chartConfig || {};
+    
+    // Bar/Histogram charts
+    if (chartData.chartType === 'bar' || chartData.chartType === 'histogram') {
+        const colorPalette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+        const datasets = chartData.series.map((series, index) => ({
+            label: series.name,
+            data: series.values,
+            backgroundColor: colorPalette[index % colorPalette.length],
+            borderColor: colorPalette[index % colorPalette.length],
+            borderWidth: 1
+        }));
+        
+        const isHistogram = chartData.chartType === 'histogram';
+        
+        chartInstances[chartId] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.xLabels || [],
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: datasets.length > 1
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        min: config.yAxis?.min,
+                        max: config.yAxis?.max,
+                        title: {
+                            display: true,
+                            text: config.yAxis?.title || chartData.yLabel || 'Value'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: config.xAxis?.title || chartData.xLabel || 'Category'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Pie chart
+    else if (chartData.chartType === 'pie') {
+        const seriesData = chartData.series[0].values;
+        const labels = seriesData.map(item => item.name);
+        const values = seriesData.map(item => item.value);
+        
+        chartInstances[chartId] = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+    
+    // Scatter plot
+    else if (chartData.chartType === 'scatter') {
+        chartInstances[chartId] = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Data Points',
+                    data: chartData.points,
+                    backgroundColor: '#36A2EB',
+                    borderColor: '#36A2EB',
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        min: config.xAxis?.min,
+                        max: config.xAxis?.max,
+                        title: {
+                            display: true,
+                            text: config.xAxis?.title || chartData.xLabel || 'X Variable'
+                        }
+                    },
+                    y: {
+                        min: config.yAxis?.min,
+                        max: config.yAxis?.max,
+                        title: {
+                            display: true,
+                            text: config.yAxis?.title || chartData.yLabel || 'Y Variable'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+    
+    // Dotplot
+    else if (chartData.chartType === 'dotplot') {
+        const valueFrequency = {};
+        chartData.values.forEach(value => {
+            valueFrequency[value] = (valueFrequency[value] || 0) + 1;
+        });
+        
+        const dotplotData = [];
+        for (const [value, frequency] of Object.entries(valueFrequency)) {
+            for (let i = 1; i <= frequency; i++) {
+                dotplotData.push({
+                    x: parseFloat(value),
+                    y: i
+                });
+            }
+        }
+        
+        chartInstances[chartId] = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Data Points',
+                    data: dotplotData,
+                    backgroundColor: '#36A2EB',
+                    borderColor: '#36A2EB',
+                    pointRadius: 4,
+                    showLine: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        min: config.xAxis?.min,
+                        max: config.xAxis?.max,
+                        title: {
+                            display: true,
+                            text: config.xAxis?.title || 'Value'
+                        }
+                    },
+                    y: {
+                        min: 0,
+                        max: Math.max(...Object.values(valueFrequency)) + 1,
+                        display: false
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+    
+    // Boxplot
+    else if (chartData.chartType === 'boxplot') {
+        const boxplotData = config.boxplotData || {};
+        const { Q1, Q3, median, min, max } = boxplotData;
+        
+        // Create a simple representation using bar chart
+        chartInstances[chartId] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Min', 'Q1', 'Median', 'Q3', 'Max'],
+                datasets: [{
+                    label: 'Five Number Summary',
+                    data: [min, Q1, median, Q3, max],
+                    backgroundColor: '#36A2EB'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: config.xAxis?.title || 'Value'
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+// Complete table rendering
+function renderTable(table) {
+    if (!table) return '';
+    
+    let html = '<div class="table-container"><table>';
+    
+    // Handle object format with headers and rows
+    if (table.headers && table.rows) {
+        html += '<thead><tr>';
+        table.headers.forEach(header => {
+            html += `<th>${header}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+        
+        table.rows.forEach(row => {
+            html += '<tr>';
+            row.forEach(cell => {
+                html += `<td>${cell}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody>';
+    }
+    // Handle array format (legacy)
+    else if (Array.isArray(table) && table.length > 0) {
+        const headers = table[0];
+        const rows = table.slice(1);
+        
+        html += '<thead><tr>';
+        headers.forEach(header => {
+            html += `<th>${header}</th>`;
+        });
+        html += '</tr></thead>';
+        
+        if (rows.length > 0) {
+            html += '<tbody>';
+            rows.forEach(row => {
+                html += '<tr>';
+                row.forEach(cell => {
+                    html += `<td>${cell}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody>';
+        }
+    }
+    
+    html += '</table></div>';
+    return html;
+}
+
+// Updated renderAttachments to handle multiple charts
+function renderAttachments(attachments, questionId) {
+    let html = '';
+    
+    // Handle multiple charts
+    if (attachments.charts && Array.isArray(attachments.charts)) {
+        attachments.charts.forEach((chart, idx) => {
+            html += renderChart(chart, `${questionId}-chart-${idx}`);
+        });
+    }
+    // Handle single chart
+    else if (attachments.chartType) {
+        html += renderChart(attachments, `${questionId}-chart`);
+    }
+    
+    // Handle tables
+    if (attachments.table) {
+        html += renderTable(attachments.table);
+    }
+    
+    // Handle images
+    if (attachments.image) {
+        const imageAlt = attachments.imageAlt || 'Question image';
+        const imageCaption = attachments.imageCaption || '';
+        html += `
+            <div class="image-container">
+                <img src="${attachments.image}" alt="${imageAlt}" style="max-width: 100%; height: auto;">
+                ${imageCaption ? `<div style="text-align: center; font-style: italic; color: #666; margin-top: 5px;">${imageCaption}</div>` : ''}
+            </div>
+        `;
+    }
+    
+    // Handle multiple images
+    if (attachments.images && Array.isArray(attachments.images)) {
+        html += '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">';
+        attachments.images.forEach(img => {
+            html += `
+                <div style="flex: 1; min-width: 200px; max-width: 400px;">
+                    <img src="${img.url || img}" alt="${img.alt || 'Image'}" style="width: 100%; height: auto;">
+                    ${img.caption ? `<div style="text-align: center; font-style: italic; color: #666; margin-top: 5px;">${img.caption}</div>` : ''}
+                </div>
+            `;
+        });
+        html += '</div>';
+    }
+    
+    return html;
+}
+
+        // Render visible charts
+        function renderVisibleCharts() {
+            const chartContainers = document.querySelectorAll('[data-chart-id]');
+            chartContainers.forEach(container => {
+                const chartId = container.dataset.chartId;
+                if (window.pendingCharts && window.pendingCharts[chartId]) {
+                    renderChartNow(chartId);
+                    delete window.pendingCharts[chartId];
+                }
+            });
+        }
+
+        // Actually render a chart
+        function renderChartNow(chartId) {
+            const canvas = document.getElementById(chartId);
+            if (!canvas) return;
+
+            // FIX: Check if chart already exists and destroy it
+            if (chartInstances[chartId]) {
+                chartInstances[chartId].destroy();
+                delete chartInstances[chartId];
+            }
+
+            const chartData = window.pendingCharts[chartId];
+            if (!chartData) return;
+
+            const ctx = canvas.getContext('2d');
+
+            // FIX: Set canvas parent height to prevent infinite expansion
+            canvas.parentElement.style.height = '400px';
+            canvas.parentElement.style.position = 'relative';
+
+            const config = chartData.chartConfig || {};
+            
+            // Simple bar/histogram chart
+            if (chartData.chartType === 'bar' || chartData.chartType === 'histogram') {
+                const datasets = chartData.series.map(series => ({
+                    label: series.name,
+                    data: series.values,
+                    backgroundColor: '#36A2EB',
+                    borderColor: '#36A2EB',
+                    borderWidth: 1
+                }));
+                
+                chartInstances[chartId] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: chartData.xLabels || [],
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: config.yAxis?.title || 'Value'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: config.xAxis?.title || 'Category'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            // Add other chart types as needed
+        }
+
+        // Submit answer
+        window.submitAnswer = function(questionId, questionType) {
+            if (!currentUsername) {
+                showMessage('Please enter your username first!', 'error');
+                return;
+            }
+
+            const errorSpan = document.getElementById(`error-${questionId}`);
+            const successSpan = document.getElementById(`success-${questionId}`);
+            
+            // Clear previous messages
+            if (errorSpan) {
+                errorSpan.textContent = '';
+                errorSpan.classList.remove('show');
+            }
+            if (successSpan) {
+                successSpan.textContent = '';
+                successSpan.classList.remove('show');
+            }
+
+            // Get current attempt count
+            const attempts = getAttemptCount(questionId);
+            
+            // Check if can retry
+            if (attempts > 0 && !canRetry(questionId)) {
+                if (errorSpan) {
+                    errorSpan.textContent = attempts >= 3 ? 
+                        'Maximum attempts reached (3).' : 
+                        'Please provide reasoning with your previous answer to enable retry.';
+                    errorSpan.classList.add('show');
+                }
+                return;
+            }
+
+            // Get answer value
+            let value = '';
+            if (questionType === 'multiple-choice') {
+                const selectedRadio = document.querySelector(`input[name="choice-${questionId}"]:checked`);
+                if (!selectedRadio) {
+                    if (errorSpan) {
+                        errorSpan.textContent = 'Please select an answer.';
+                        errorSpan.classList.add('show');
+                    }
+                    return;
+                }
+                value = selectedRadio.value;
+            } else {
+                const textarea = document.getElementById(`frq-${questionId}`);
+                if (!textarea || !textarea.value.trim()) {
+                    if (errorSpan) {
+                        errorSpan.textContent = 'Please enter a response.';
+                        errorSpan.classList.add('show');
+                    }
+                    return;
+                }
+                value = textarea.value.trim();
+            }
+
+            // Get reason
+            const reasonTextarea = document.getElementById(`reason-${questionId}`);
+            const reason = reasonTextarea ? reasonTextarea.value.trim() : '';
+
+            // If this is a retry (attempts > 0), reason is required
+            if (attempts > 0 && !reason) {
+                if (errorSpan) {
+                    errorSpan.textContent = 'Reasoning is required for retry attempts.';
+                    errorSpan.classList.add('show');
+                }
+                reasonTextarea.classList.add('required');
+                reasonTextarea.focus();
+                return;
+            }
+
+            // Save answer
+            if (!classData.users[currentUsername]) {
+                classData.users[currentUsername] = {
+                    answers: {},
+                    reasons: {},
+                    timestamps: {},
+                    attempts: {}
+                };
+            }
+
+            classData.users[currentUsername].answers[questionId] = {
+                value: value,
+                timestamp: new Date().toISOString()
+            };
+            classData.users[currentUsername].reasons[questionId] = reason;
+            classData.users[currentUsername].timestamps[questionId] = new Date().toISOString();
+            classData.users[currentUsername].attempts[questionId] = attempts + 1;
+
+            saveClassData();
+
+            // Update UI
+            const submitBtn = document.getElementById(`submit-${questionId}`);
+            const qContainer = document.querySelector(`[data-question-id="${questionId}"]`);
+            
+            // Update button
+            if (submitBtn) {
+                if (!canRetry(questionId)) {
+                    submitBtn.textContent = 'Max Attempts Reached';
+                    submitBtn.disabled = true;
+                } else {
+                    submitBtn.textContent = 'Update Answer';
+                }
+            }
+
+            // Show success message
+            if (successSpan) {
+                successSpan.textContent = 'Answer submitted successfully!';
+                successSpan.classList.add('show');
+                setTimeout(() => {
+                    successSpan.classList.remove('show');
+                }, 3000);
+            }
+
+            // Update header to show answered
+            const header = qContainer.querySelector('.question-header');
+            if (header && !header.querySelector('span[style*="color"]')) {
+                header.innerHTML += '<span style="color: #a5d6a7;">✓ Answered</span>';
+            }
+
+            // Show/update dotplot immediately after submission
+            const dotplotSection = document.getElementById(`dotplot-section-${questionId}`);
+
+            // Ensure the section is visible
+            if (!dotplotSection.classList.contains('show')) {
+                dotplotSection.classList.add('show');
+                dotplotSection.style.opacity = '0';
+                setTimeout(() => {
+                    dotplotSection.style.transition = 'opacity 0.3s ease';
+                    dotplotSection.style.opacity = '1';
+                }, 10);
+            }
+
+            // Always destroy existing chart to force complete refresh
+            const chartId = `dotplot-${questionId}`;
+            if (chartInstances[chartId]) {
+                try {
+                    chartInstances[chartId].destroy();
+                } catch(e) {
+                    console.log('Error destroying chart:', e);
+                }
+                delete chartInstances[chartId];
+            }
+
+            // Clear the canvas to ensure clean slate
+            const canvas = document.getElementById(chartId);
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Render the appropriate visualization with a small delay to ensure DOM is ready
+            setTimeout(() => {
+                if (questionType === 'multiple-choice') {
+                    renderMCQDistribution(questionId);
+                } else {
+                    renderFRQResponses(questionId);
+                }
+            }, 50);
+        }
+
+        // Show dotplot
+        function showDotplot(questionId, questionType) {
+    const dotplotSection = document.getElementById(`dotplot-section-${questionId}`);
+    if (!dotplotSection) return;
+
+    // Ensure the section has all required containers
+    if (!document.getElementById(`dotplot-${questionId}`)) {
+        dotplotSection.innerHTML = `
+            <canvas id="dotplot-${questionId}" width="400" height="200"></canvas>
+            <div id="consensus-${questionId}"></div>
+            <div class="contributors-list" id="contributors-${questionId}"></div>
+        `;
+    }
+
+    // Always destroy existing chart first to force refresh
+    if (chartInstances[`dotplot-${questionId}`]) {
+        chartInstances[`dotplot-${questionId}`].destroy();
+        delete chartInstances[`dotplot-${questionId}`];
+    }
+
+    // Show the section with animation
+    if (!dotplotSection.classList.contains('show')) {
+        dotplotSection.classList.add('show');
+        dotplotSection.style.opacity = '0';
+        setTimeout(() => {
+            dotplotSection.style.transition = 'opacity 0.3s ease';
+            dotplotSection.style.opacity = '1';
+        }, 10);
+    }
+
+    // Render with a small delay to ensure DOM is ready
+    setTimeout(() => {
+        if (questionType === 'multiple-choice') {
+            renderMCQDistribution(questionId);
+        } else {
+            renderFRQResponses(questionId);
+        }
+    }, 50);
+}
+
+        // Render MCQ distribution
+        function renderMCQDistribution(questionId) {
+            const canvas = document.getElementById(`dotplot-${questionId}`);
+            if (!canvas) return;
+
+            // Fix canvas dimensions to prevent cropping
+            const container = canvas.parentElement;
+            container.style.height = '500px';  // Increased from 350px
+            container.style.position = 'relative';
+            container.style.overflow = 'visible';  // Changed from 'hidden' to 'visible'
+
+            // Ensure the canvas itself has room
+            canvas.style.height = '600px';  // Increased from 300px
+            canvas.style.width = '100%';
+
+            // Aggregate responses
+            const choiceCounts = {};
+            let totalCount = 0;
+            const contributors = [];
+
+            // Get the question to know all possible choices
+            const question = currentQuestions.find(q => q.id === questionId);
+            const allChoices = question?.choices || question?.attachments?.choices || [];
+
+            // Initialize all choices with 0
+            allChoices.forEach(choice => {
+                choiceCounts[choice.key] = 0;
+            });
+
+            // Count actual responses
+            for (let username in classData.users) {
+                const userAnswer = classData.users[username].answers?.[questionId];
+                if (userAnswer) {
+                    const choice = userAnswer.value || userAnswer;
+                    const reason = classData.users[username].reasons?.[questionId] || '';
+
+                    choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
+                    totalCount++;
+                    contributors.push({
+                        username: username,
+                        choice: choice,
+                        reason: reason
+                    });
+                }
+            }
+
+            // Create bar chart (like your example JSON)
+            const ctx = canvas.getContext('2d');
+            const choices = Object.keys(choiceCounts).sort();
+            const counts = choices.map(c => choiceCounts[c] || 0);
+            const relativeFrequencies = counts.map(c => totalCount > 0 ? c / totalCount : 0);
+
+            // Destroy existing chart if any
+            // Destroy existing chart if any
+if (chartInstances[`dotplot-${questionId}`]) {
+    chartInstances[`dotplot-${questionId}`].destroy();
+    delete chartInstances[`dotplot-${questionId}`];  // Add just this line
+}
+            // Create bar chart with relative frequencies
+            chartInstances[`dotplot-${questionId}`] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: choices,
+                    datasets: [{
+                        label: 'Relative Frequency',
+                        data: relativeFrequencies,
+                        backgroundColor: choices.map(c => {
+                            // Highlight user's choice in different color
+                            const userChoice = classData.users[currentUsername]?.answers?.[questionId];
+                            const userChoiceValue = userChoice?.value || userChoice;
+                            return c === userChoiceValue ? '#4CAF50' : '#36A2EB';
+                        }),
+                        borderColor: '#2196F3',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            bottom: 20
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: {
+                                stepSize: 0.1,
+                                callback: function(value) {
+                                    return (value * 100).toFixed(0) + '%';
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Relative Frequency'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Answer Choice'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.y;
+                                    const percentage = (value * 100).toFixed(1);
+                                    const count = counts[context.dataIndex];
+                                    return `${percentage}% (${count} of ${totalCount} responses)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Add consensus coloring
+            const maxFreq = Math.max(...relativeFrequencies);
+            const consensusDiv = document.getElementById(`consensus-${questionId}`);
+            if (maxFreq >= 0.7) {
+                consensusDiv.style.backgroundColor = '#e8f5e9';
+                consensusDiv.style.border = '2px solid #4CAF50';
+            } else if (maxFreq >= 0.6) {
+                consensusDiv.style.backgroundColor = '#fff3e0';
+                consensusDiv.style.border = '2px solid #ff9800';
+            } else {
+                consensusDiv.style.backgroundColor = '#ffebee';
+                consensusDiv.style.border = '2px solid #f44336';
+            }
+
+            // Show consensus message
+            if (consensusDiv) {
+                if (totalCount > 1) {
+                    const modeIndex = relativeFrequencies.indexOf(maxFreq);
+                    const mode = choices[modeIndex];
+                    const percentage = (maxFreq * 100).toFixed(0);
+
+                    // Check for consensus (70% or more agreement)
+                    if (maxFreq >= 0.7) {
+                        consensusDiv.innerHTML = `
+                            <div class="consensus-msg consensus">
+                                ✓ Consensus reached on choice ${mode} (${percentage}% agreement)
+                            </div>
+                        `;
+                    } else {
+                        consensusDiv.innerHTML = `
+                            <div class="consensus-msg no-consensus">
+                                No consensus yet - highest agreement: ${mode} at ${percentage}%
+                            </div>
+                        `;
+                    }
+                } else {
+                    consensusDiv.innerHTML = `
+                        <div class="consensus-msg no-consensus">
+                            You're the first to answer! Import class data to see peer responses.
+                        </div>
+                    `;
+                }
+            }
+
+            // Show contributors with their choices and reasons
+            const contributorsDiv = document.getElementById(`contributors-${questionId}`);
+            if (contributorsDiv && contributors.length > 0) {
+                let html = '<h4 style="margin-top: 10px;">Individual Responses:</h4>';
+                contributors.forEach(c => {
+                    const isCurrentUser = c.username === currentUsername;
+                    const badges = calculateBadges(c.username);
+                    const badgeText = badges.length > 0 ? ` ${badges.join(' ')}` : '';
+
+                    // CRITICAL: Always show the reason if it exists
+                    html += `
+                        <div class="contributor-item" style="${isCurrentUser ? 'background: #e3f2fd;' : ''}">
+                            <span class="contributor-choice">${c.username}${badgeText} → Choice ${c.choice}</span>
+                            ${c.reason ? `<div class="contributor-reason" style="margin-top: 5px; padding: 8px; background: #f9f9f9; border-left: 3px solid #2196F3; font-style: italic;">"${c.reason}"</div>` : '<div style="color: #999; font-style: italic; margin-top: 5px;">No explanation provided</div>'}
+                        </div>
+                    `;
+                });
+                contributorsDiv.innerHTML = html;
+            }
+        }
+
+        // Render FRQ responses
+        function renderFRQResponses(questionId) {
+            const canvas = document.getElementById(`dotplot-${questionId}`);
+            const consensusDiv = document.getElementById(`consensus-${questionId}`);
+            const contributorsDiv = document.getElementById(`contributors-${questionId}`);
+            
+            if (canvas) canvas.style.display = 'none';
+            
+            const responses = [];
+            for (let username in classData.users) {
+                const userAnswer = classData.users[username].answers?.[questionId];
+                if (userAnswer) {
+                    const response = userAnswer.value || userAnswer;
+                    const reason = classData.users[username].reasons?.[questionId] || '';
+                    responses.push({
+                        username: username,
+                        response: response,
+                        reason: reason
+                    });
+                }
+            }
+            
+            if (consensusDiv) {
+                if (responses.length > 1) {
+                    consensusDiv.innerHTML = `
+                        <div class="consensus-msg no-consensus">
+                            ${responses.length} responses submitted. Review peer responses below.
+                        </div>
+                    `;
+                } else {
+                    consensusDiv.innerHTML = `
+                        <div class="consensus-msg no-consensus">
+                            Your response recorded. Import class data to see peer responses.
+                        </div>
+                    `;
+                }
+            }
+            
+            if (contributorsDiv) {
+                let html = '<h4>Responses:</h4>';
+                responses.forEach(r => {
+                    const userVotes = classData.users[currentUsername]?.votes?.[questionId]?.[r.username] || {};
+                    html += `
+                        <div class="contributor-item">
+                            <strong>${r.username}:</strong>
+                            <div style="margin-top: 5px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                                ${r.response}
+                            </div>
+                            ${r.reason ? `<div class="contributor-reason">${r.reason}</div>` : ''}
+                            <div style="margin-top: 10px;">
+                                <button onclick="voteFRQ('${questionId}', '${r.username}', 'helpful')"
+                                        class="vote-btn ${userVotes.type === 'helpful' ? 'active' : ''}">
+                                    💡 Helpful (${getVoteCount(questionId, r.username, 'helpful')})
+                                </button>
+                                <button onclick="voteFRQ('${questionId}', '${r.username}', 'unclear')"
+                                        class="vote-btn ${userVotes.type === 'unclear' ? 'active' : ''}">
+                                    🤔 Unclear (${getVoteCount(questionId, r.username, 'unclear')})
+                                </button>
+                                <button onclick="voteFRQ('${questionId}', '${r.username}', 'contradicts')"
+                                        class="vote-btn ${userVotes.type === 'contradicts' ? 'active' : ''}">
+                                    ⚔️ Contradicts (${getVoteCount(questionId, r.username, 'contradicts')})
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                contributorsDiv.innerHTML = html;
+            }
+        }
+
+        // Helper function to get vote count
+        function getVoteCount(questionId, targetUser, voteType) {
+            let count = 0;
+            for (let username in classData.users) {
+                const userVotes = classData.users[username].votes?.[questionId]?.[targetUser];
+                if (userVotes?.type === voteType) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        // Vote FRQ function
+        window.voteFRQ = function(questionId, targetUser, voteType) {
+            if (!classData.users[currentUsername].votes) {
+                classData.users[currentUsername].votes = {};
+            }
+            if (!classData.users[currentUsername].votes[questionId]) {
+                classData.users[currentUsername].votes[questionId] = {};
+            }
+
+            const existingVote = classData.users[currentUsername].votes[questionId][targetUser];
+            if (existingVote?.type === voteType) {
+                // Remove vote if clicking same button
+                delete classData.users[currentUsername].votes[questionId][targetUser];
+            } else {
+                // Set new vote
+                classData.users[currentUsername].votes[questionId][targetUser] = {
+                    type: voteType,
+                    timestamp: new Date().toISOString()
+                };
+            }
+
+            saveClassData();
+            renderFRQResponses(questionId);
+        }
+
+        // Load progress
+        function loadProgress() {
+            if (!currentUsername || !classData) return;
+
+            // Add a counter for staggered rendering
+            let renderDelay = 0;
+
+            currentQuestions.forEach((question, index) => {
+                const qId = question.id;
+                const qContainer = document.querySelector(`[data-question-id="${qId}"]`);
+                if (!qContainer) return;
+
+                const isAnswered = isQuestionAnswered(qId);
+                if (isAnswered) {
+                    // Show dotplot with staggered delay to ensure proper rendering
+                    const questionType = question.type;
+
+                    // Use setTimeout with increasing delay for each question
+                    setTimeout(() => {
+                        // First ensure the dotplot section is visible
+                        const dotplotSection = document.getElementById(`dotplot-section-${qId}`);
+                        if (dotplotSection) {
+                            dotplotSection.innerHTML = `
+                                <canvas id="dotplot-${qId}" width="400" height="200"></canvas>
+                                <div id="consensus-${qId}"></div>
+                                <div class="contributors-list" id="contributors-${qId}"></div>
+                            `;
+                            dotplotSection.classList.add('show');
+                            dotplotSection.style.opacity = '1';
+                        }
+
+                        // Now render the visualization
+                        if (questionType === 'multiple-choice') {
+                            renderMCQDistribution(qId);
+                        } else {
+                            renderFRQResponses(qId);
+                        }
+                    }, renderDelay);
+
+                    // Increase delay for next question (100ms between each)
+                    renderDelay += 100;
+
+                    // Update button state
+                    const submitBtn = document.getElementById(`submit-${qId}`);
+                    if (submitBtn) {
+                        if (!canRetry(qId)) {
+                            submitBtn.textContent = 'Max Attempts Reached';
+                            submitBtn.disabled = true;
+                        } else {
+                            submitBtn.textContent = 'Update Answer';
+                        }
+                    }
+                }
+            });
+        }
+
+        // ALTERNATE SOLUTION: If the above doesn't work, add this function to force refresh all visualizations:
+        function refreshAllVisualizations() {
+            // Call this after data import or when viewing past quizzes
+            setTimeout(() => {
+                currentQuestions.forEach((question, index) => {
+                    const qId = question.id;
+                    const isAnswered = isQuestionAnswered(qId);
+
+                    if (isAnswered) {
+                        setTimeout(() => {
+                            const questionType = question.type;
+                            if (questionType === 'multiple-choice') {
+                                renderMCQDistribution(qId);
+                            } else {
+                                renderFRQResponses(qId);
+                            }
+                        }, index * 100); // Stagger by 100ms per question
+                    }
+                });
+            }, 500); // Initial delay to ensure DOM is ready
+        }
+
+        // Export personal data
+        window.exportPersonal = function() {
+            const personalData = {
+                exportTime: new Date().toISOString(),
+                username: currentUsername,
+                users: {
+                    [currentUsername]: classData.users[currentUsername]
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(personalData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentUsername}_data.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showMessage('Personal data exported successfully!', 'success');
+        }
+
+        // Export master database with all data
+        window.exportMasterData = function() {
+            // Get ALL data from localStorage, not filtered by user
+            const masterData = {
+                timestamp: new Date().toISOString(),
+                exportType: 'master_database',
+                allUsers: Object.keys(localStorage)
+                    .filter(key => key.includes('_username') || key.includes('answers_'))
+                    .map(key => key.split('_')[1])
+                    .filter((v, i, a) => a.indexOf(v) === i), // unique usernames
+
+                // Get all class data without filtering
+                classData: JSON.parse(localStorage.getItem('classData') || '{}'),
+
+                // Get all answers from all users
+                allAnswers: {},
+
+                // Get all progress from all users
+                allProgress: {},
+
+                // Get any other data structures you have
+                consensusData: JSON.parse(localStorage.getItem('consensusResponses') || '{}'),
+
+                // Include raw localStorage for complete backup
+                rawLocalStorage: {}
+            };
+
+            // Collect all answers for all users
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('answers_')) {
+                    const username = key.replace('answers_', '');
+                    masterData.allAnswers[username] = JSON.parse(localStorage.getItem(key) || '{}');
+                }
+                if (key.startsWith('progress_')) {
+                    const username = key.replace('progress_', '');
+                    masterData.allProgress[username] = JSON.parse(localStorage.getItem(key) || '{}');
+                }
+
+                // Store everything in raw format too
+                masterData.rawLocalStorage[key] = localStorage.getItem(key);
+            });
+
+            // Create and download the file
+            const blob = new Blob([JSON.stringify(masterData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `master_database_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showMessage('Master database exported successfully!', 'success');
+        }
+
+
+        // Import class data
+        window.importClassData = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+
+                    // Check if this is a master database export
+                    if (importedData.exportType === 'master_database') {
+                        mergeMasterData(importedData);
+                    } else {
+                        // Handle regular class data import (existing behavior)
+                        mergeRegularClassData(importedData);
+                    }
+
+                } catch (error) {
+                    showMessage('Error importing data: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function mergeMasterData(masterData) {
+            let updatedCount = 0;
+            let preservedCount = 0;
+
+            // Get current user's existing data
+            const currentUserAnswers = JSON.parse(localStorage.getItem(`answers_${currentUsername}`) || '{}');
+            const currentUserProgress = JSON.parse(localStorage.getItem(`progress_${currentUsername}`) || '{}');
+
+            // Merge class-wide data (consensus, etc.) - always take the master version for these
+            if (masterData.classData) {
+                localStorage.setItem('classData', JSON.stringify(masterData.classData));
+            }
+            if (masterData.consensusData) {
+                localStorage.setItem('consensusResponses', JSON.stringify(masterData.consensusData));
+            }
+
+            // Import OTHER users' data completely (not the current user)
+            if (masterData.allAnswers) {
+                Object.keys(masterData.allAnswers).forEach(username => {
+                    if (username !== currentUsername) {
+                        // Import other users' data completely
+                        localStorage.setItem(`answers_${username}`, JSON.stringify(masterData.allAnswers[username]));
+                        updatedCount++;
+                    }
+                });
+            }
+
+            if (masterData.allProgress) {
+                Object.keys(masterData.allProgress).forEach(username => {
+                    if (username !== currentUsername) {
+                        localStorage.setItem(`progress_${username}`, JSON.stringify(masterData.allProgress[username]));
+                    }
+                });
+            }
+
+            // For the CURRENT user, merge intelligently
+            if (masterData.allAnswers && masterData.allAnswers[currentUsername]) {
+                const importedUserAnswers = masterData.allAnswers[currentUsername];
+
+                // Merge answers - keep newer ones based on timestamp or attempt count
+                Object.keys(importedUserAnswers).forEach(questionId => {
+                    const importedAnswer = importedUserAnswers[questionId];
+                    const currentAnswer = currentUserAnswers[questionId];
+
+                    if (!currentAnswer) {
+                        // No existing answer, take the imported one
+                        currentUserAnswers[questionId] = importedAnswer;
+                        updatedCount++;
+                    } else {
+                        // Compare and keep the better/newer one
+                        // Option 1: Keep the one with more attempts (more work done)
+                        if (importedAnswer.attempts && currentAnswer.attempts) {
+                            if (importedAnswer.attempts > currentAnswer.attempts) {
+                                currentUserAnswers[questionId] = importedAnswer;
+                                updatedCount++;
+                            } else {
+                                preservedCount++;
+                            }
+                        }
+                        // Option 2: Keep the one with a timestamp (if you have timestamps)
+                        else if (importedAnswer.timestamp && currentAnswer.timestamp) {
+                            if (new Date(importedAnswer.timestamp) > new Date(currentAnswer.timestamp)) {
+                                currentUserAnswers[questionId] = importedAnswer;
+                                updatedCount++;
+                            } else {
+                                preservedCount++;
+                            }
+                        }
+                        // Option 3: Keep the one that's correct (if applicable)
+                        else if (currentAnswer.correct) {
+                            preservedCount++;
+                        } else if (importedAnswer.correct) {
+                            currentUserAnswers[questionId] = importedAnswer;
+                            updatedCount++;
+                        } else {
+                            // Default: preserve current
+                            preservedCount++;
+                        }
+                    }
+                });
+
+                // Save the merged answers
+                localStorage.setItem(`answers_${currentUsername}`, JSON.stringify(currentUserAnswers));
+            }
+
+            // Merge progress similarly
+            if (masterData.allProgress && masterData.allProgress[currentUsername]) {
+                const importedProgress = masterData.allProgress[currentUsername];
+
+                Object.keys(importedProgress).forEach(lessonId => {
+                    if (!currentUserProgress[lessonId] ||
+                        importedProgress[lessonId] > currentUserProgress[lessonId]) {
+                        currentUserProgress[lessonId] = importedProgress[lessonId];
+                    }
+                });
+
+                localStorage.setItem(`progress_${currentUsername}`, JSON.stringify(currentUserProgress));
+            }
+
+            // Import any other non-user-specific data from rawLocalStorage
+            if (masterData.rawLocalStorage) {
+                Object.keys(masterData.rawLocalStorage).forEach(key => {
+                    // Skip user-specific data for current user
+                    if (!key.includes(`_${currentUsername}`) &&
+                        !key.startsWith('answers_') &&
+                        !key.startsWith('progress_')) {
+
+                        // Only import if it doesn't exist or is older
+                        const existingData = localStorage.getItem(key);
+                        if (!existingData) {
+                            localStorage.setItem(key, masterData.rawLocalStorage[key]);
+                        }
+                    }
+                });
+            }
+
+            showMessage(`Master data merged! Updated: ${updatedCount} items, Preserved your work: ${preservedCount} items`, 'success');
+
+            // Reload to show the updated data
+            setTimeout(() => location.reload(), 2000);
+        }
+
+        function mergeRegularClassData(importedData) {
+            // Your existing import logic for regular class data
+            // This handles non-master imports as before
+            const classData = JSON.parse(localStorage.getItem('classData') || '{}');
+
+            // Merge the imported data with existing...
+            // [Your existing merge logic here]
+
+            localStorage.setItem('classData', JSON.stringify(classData));
+            showMessage('Class data imported successfully!', 'success');
+            location.reload();
+        }
+
+        // Show message
+        function showMessage(text, type) {
+            const messageArea = document.getElementById('messageArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            
+            messageArea.innerHTML = '';
+            messageArea.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.style.opacity = '0';
+                setTimeout(() => messageArea.innerHTML = '', 300);
+            }, 5000);
+        }
+
+        // Theme management
+        function initTheme() {
+            const savedTheme = localStorage.getItem('quizTheme') || 'light';
+            currentTheme = savedTheme;
+            applyTheme(savedTheme);
+        }
+
+        function applyTheme(theme) {
+            const body = document.body;
+            const themeButton = document.querySelector('.theme-toggle');
+            
+            if (theme === 'dark') {
+                body.classList.add('dark-theme');
+                if (themeButton) themeButton.textContent = '☀️';
+            } else {
+                body.classList.remove('dark-theme');
+                if (themeButton) themeButton.textContent = '🌙';
+            }
+            
+            currentTheme = theme;
+            localStorage.setItem('quizTheme', theme);
+        }
+
+        window.toggleTheme = function() {
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(newTheme);
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            initTheme();
+            
+            // Check localStorage support
+            if (!window.localStorage) {
+                showMessage('Warning: LocalStorage is not available. Data will not be saved.', 'error');
+            }
+            
+            promptUsername();
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+S to export data
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                if (currentUsername) {
+                    exportPersonal();
+                }
+            }
+        });
+
+        // Intersection Observer for lazy loading charts (optional enhancement)
+        if ('IntersectionObserver' in window) {
+            const chartObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const container = entry.target;
+                        const chartId = container.dataset.chartId;
+                        if (chartId && window.pendingCharts && window.pendingCharts[chartId]) {
+                            renderChartNow(chartId);
+                            delete window.pendingCharts[chartId];
+                            chartObserver.unobserve(container);
+                        }
+                    }
+                });
+            }, {
+                rootMargin: '100px'
+            });
+            
+            // Observe chart containers when they're created
+            window.observeChartContainers = function() {
+                document.querySelectorAll('[data-chart-id]').forEach(container => {
+                    chartObserver.observe(container);
+                });
+            }
+        }
+
+        // Pig Sprite Controller
+        class PigSprite {
+            constructor(color = 'pink') {
+                this.x = window.innerWidth / 2;
+                this.y = 100;
+                this.frame = 0;
+                this.animationRow = 0; // 0 for top row, 1 for bottom row
+                this.facingRight = true;
+                this.isJumping = false;
+                this.velocity = { x: 0, y: 0 };
+                this.color = color;
+
+                this.createElement();
+                this.bindControls();
+                this.startAnimation();
+            }
+
+            createElement() {
+                this.element = document.createElement('div');
+                this.element.className = 'pig-sprite';
+                this.element.style.left = this.x + 'px';
+                this.element.style.bottom = this.y + 'px';
+
+                // Apply color filter if needed
+                if (this.color !== 'pink') {
+                    this.element.style.filter = this.getColorFilter(this.color);
+                }
+
+                document.body.appendChild(this.element);
+            }
+
+            getColorFilter(color) {
+                // CSS filters to change pig color
+                const filters = {
+                    'blue': 'hue-rotate(200deg)',
+                    'green': 'hue-rotate(90deg)',
+                    'purple': 'hue-rotate(270deg)',
+                    'yellow': 'hue-rotate(45deg) saturate(1.5)',
+                    'red': 'hue-rotate(-10deg) saturate(1.5)',
+                    'gray': 'grayscale(100%)'
+                };
+                return filters[color] || '';
+            }
+
+            bindControls() {
+                document.addEventListener('keydown', (e) => {
+                    // Add this check before the switch statement
+                    const activeElement = document.activeElement;
+                    const isTyping = activeElement && (
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.tagName === 'INPUT' ||
+                        activeElement.contentEditable === 'true' ||
+                        activeElement.classList.contains('frq-textarea') ||
+                        activeElement.classList.contains('reason-textarea')
+                    );
+
+                    // Don't capture keys if user is typing
+                    if (isTyping) {
+                        return;
+                    }
+
+                    switch(e.key) {
+                        case 'ArrowLeft':
+                            this.moveLeft();
+                            e.preventDefault();
+                            break;
+                        case 'ArrowRight':
+                            this.moveRight();
+                            e.preventDefault();
+                            break;
+                        case 'ArrowUp':
+                        case ' ':
+                            this.jump();
+                            e.preventDefault();
+                            break;
+                        case 'ArrowDown':
+                            this.animationRow = this.animationRow === 0 ? 1 : 0;
+                            e.preventDefault();
+                            break;
+                    }
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    // Add the same check here too
+                    const activeElement = document.activeElement;
+                    const isTyping = activeElement && (
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.tagName === 'INPUT' ||
+                        activeElement.contentEditable === 'true' ||
+                        activeElement.classList.contains('frq-textarea') ||
+                        activeElement.classList.contains('reason-textarea')
+                    );
+
+                    if (isTyping) {
+                        return;
+                    }
+
+                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                        this.velocity.x = 0;
+                    }
+                });
+            }
+
+            moveLeft() {
+                this.velocity.x = -5;
+                this.facingRight = false;
+                this.element.classList.add('facing-left');
+            }
+
+            moveRight() {
+                this.velocity.x = 5;
+                this.facingRight = true;
+                this.element.classList.remove('facing-left');
+            }
+
+            jump() {
+                if (!this.isJumping) {
+                    this.isJumping = true;
+                    this.velocity.y = 15;
+
+                    setTimeout(() => {
+                        this.isJumping = false;
+                    }, 500);
+                }
+            }
+
+            updatePosition() {
+                // Update horizontal position
+                if (this.velocity.x !== 0) {
+                    this.x += this.velocity.x;
+                    this.x = Math.max(0, Math.min(window.innerWidth - 32, this.x));
+                    this.element.style.left = this.x + 'px';
+                }
+
+                // Update vertical position (gravity simulation)
+                if (this.velocity.y > 0 || this.y > 100) {
+                    this.y += this.velocity.y;
+                    this.velocity.y -= 0.8; // gravity
+
+                    if (this.y <= 100) {
+                        this.y = 100;
+                        this.velocity.y = 0;
+                    }
+
+                    this.element.style.bottom = this.y + 'px';
+                }
+            }
+
+            animate() {
+                // Cycle through frames when moving
+                if (this.velocity.x !== 0 || this.isJumping) {
+                    this.frame = (this.frame + 1) % 11;
+                } else {
+                    this.frame = 0; // idle frame
+                }
+
+                // Update sprite background position
+                const xOffset = -this.frame * 32;
+                const yOffset = -this.animationRow * 32;
+                this.element.style.backgroundPosition = `${xOffset}px ${yOffset}px`;
+            }
+
+            startAnimation() {
+                setInterval(() => {
+                    this.updatePosition();
+                    this.animate();
+                }, 50);
+            }
+
+            setColor(newColor) {
+                this.color = newColor;
+                this.element.style.filter = this.getColorFilter(newColor);
+
+                // Save to localStorage with username
+                if (currentUsername) {
+                    localStorage.setItem(`pigColor_${currentUsername}`, newColor);
+                }
+            }
+        }
+
+        // Initialize the sprite when the page loads
+        window.addEventListener('load', () => {
+            // Wait for username to be set
+            setTimeout(() => {
+                if (currentUsername) {
+                    // Load saved color for this user
+                    const savedColor = localStorage.getItem(`pigColor_${currentUsername}`) || 'pink';
+                    window.pigSprite = new PigSprite(savedColor);
+                }
+            }, 1000);
+        });
+
+        // Add color picker to the UI
+        function addColorPicker() {
+            const colorPicker = document.createElement('div');
+            colorPicker.innerHTML = `
+                <div style="position: fixed; bottom: 20px; left: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 1000;">
+                    <label>Pig Color: </label>
+                    <select id="pigColorSelect" onchange="if(window.pigSprite) window.pigSprite.setColor(this.value)">
+                        <option value="pink">Pink</option>
+                        <option value="blue">Blue</option>
+                        <option value="green">Green</option>
+                        <option value="purple">Purple</option>
+                        <option value="yellow">Yellow</option>
+                        <option value="red">Red</option>
+                        <option value="gray">Gray</option>
+                    </select>
+                </div>
+            `;
+            document.body.appendChild(colorPicker);
+        }
+
+        // Add this to your window.onload
+        window.addEventListener('load', () => {
+            addColorPicker();
+        });
+
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // New function to render unit selection menu
+        function renderUnitMenu() {
+            const questionsContainer = document.getElementById('questionsContainer');
+
+            // Sort units numerically
+            const sortedUnits = Object.keys(allCurriculumData).sort((a, b) => parseInt(a) - parseInt(b));
+
+            console.log('Rendering units:', sortedUnits); // Debug log
+
+            let unitsHtml = '';
+            sortedUnits.forEach(unitNum => {
+                const unitData = allCurriculumData[unitNum];
+                const unitName = unitStructure[unitNum]?.name || `Unit ${unitNum}`;
+                const lessonCount = unitData.unitInfo.lessonNumbers.length;
+                const questionCount = unitData.questions.length;
+
+                console.log(`Unit ${unitNum}: ${questionCount} questions, ${lessonCount} lessons`); // Debug log
+
+                // Calculate completion percentage for this unit
+                let completedQuestions = 0;
+                unitData.questions.forEach(q => {
+                    if (isQuestionAnswered(q.id)) completedQuestions++;
+                });
+                const completionPercent = questionCount > 0 ? Math.round((completedQuestions / questionCount) * 100) : 0;
+
+                unitsHtml += `
+                    <div class="unit-card" onclick="selectUnit(${unitNum})">
+                        <div class="unit-header">
+                            <h3>Unit ${unitNum}</h3>
+                            <span class="completion-badge">${completionPercent}%</span>
+                        </div>
+                        <div class="unit-title">${unitName}</div>
+                        <div class="unit-stats">
+                            <span>${lessonCount} lessons</span>
+                            <span>•</span>
+                            <span>${questionCount} questions</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${completionPercent}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            questionsContainer.innerHTML = `
+                <div class="curriculum-overview">
+                    <h2>📚 AP Statistics Curriculum</h2>
+                    <p style="text-align: center; color: #666;">Loaded ${sortedUnits.length} units</p>
+                    <div class="units-grid">
+                        ${unitsHtml}
+                    </div>
+                    <div class="app-controls" style="margin-top: 20px;">
+                        <button id="syncBtn" class="control-btn">
+                            <i class="fas fa-sync"></i>
+                            Sync
+                        </button>
+                        <input type="file" id="importFile" accept=".json" style="display: none;">
+                    </div>
+
+                    <!-- Sync Modal -->
+                    <div id="syncModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <span class="close-modal">&times;</span>
+                            <h2>Sync Options</h2>
+                            <div class="sync-buttons">
+                                <button id="exportBtn" class="modal-btn">
+                                    <i class="fas fa-download"></i>
+                                    Export
+                                </button>
+                                <button id="importBtn" class="modal-btn">
+                                    <i class="fas fa-upload"></i>
+                                    Import
+                                </button>
+                                <button id="totalExportBtn" class="modal-btn">
+                                    <i class="fas fa-database"></i>
+                                    Total Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            `;
+        }
+
+        // Function to select a unit
+        window.selectUnit = function(unitNumber) {
+            currentUnit = unitNumber;
+            const unitData = allCurriculumData[unitNumber];
+            allUnitQuestions = unitData.questions;
+
+            // Render lesson selector for this unit
+            renderLessonSelector(unitData.unitInfo);
+        }
+
+        // Modify backToUnits function to go back to unit menu instead
+        window.backToUnits = function() {
+            // Clear any existing charts
+            Object.values(chartInstances).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            });
+            chartInstances = {};
+            currentQuestions = [];
+            currentUnit = null;
+            currentLesson = null;
+
+            // Show unit menu instead of file upload
+            renderUnitMenu();
+        }
+
+
+        // Add this function to load resources from allUnitsData.js if it exists
+        async function loadUnitResources() {
+            try {
+                // Check if ALL_UNITS_DATA exists (from allUnitsData.js)
+                if (typeof ALL_UNITS_DATA !== 'undefined') {
+                    console.log('Found ALL_UNITS_DATA, integrating resources...');
+                    return ALL_UNITS_DATA;
+                }
+
+                // Try to dynamically load the file if not already loaded
+                const script = document.createElement('script');
+                script.src = 'allUnitsData.js';
+
+                return new Promise((resolve, reject) => {
+                    script.onload = () => {
+                        if (typeof ALL_UNITS_DATA !== 'undefined') {
+                            console.log('Loaded ALL_UNITS_DATA from file');
+                            resolve(ALL_UNITS_DATA);
+                        } else {
+                            resolve(null);
+                        }
+                    };
+                    script.onerror = () => resolve(null);
+                    document.head.appendChild(script);
+                });
+            } catch (error) {
+                console.log('No resources file found');
+                return null;
+            }
+        }
+
+        // Modified renderLessonSelector to show video resources
+        async function renderLessonSelectorWithResources(unitInfo) {
+            const questionsContainer = document.getElementById('questionsContainer');
+
+            // Load resources if available
+            const resources = await loadUnitResources();
+            const unitResources = resources ?
+                resources.find(u => u.unitId === `unit${currentUnit}`) : null;
+
+            let lessonButtonsHtml = '';
+
+            if (unitInfo && unitInfo.lessonNumbers) {
+                unitInfo.lessonNumbers.forEach(lessonNum => {
+                    const questions = unitInfo.lessons[lessonNum];
+                    const isCompleted = questions.every(q => isQuestionAnswered(q.id));
+                    const displayName = lessonNum === 'PC' ? 'Progress Check' : `Lesson ${lessonNum}`;
+                    const buttonId = lessonNum === 'PC' ? 'lesson-btn-PC' : `lesson-btn-${lessonNum}`;
+
+                    // Find matching resources for this lesson
+                    let resourceInfo = '';
+                    if (unitResources && lessonNum !== 'PC') {
+                        const topicId = `${currentUnit}-${lessonNum}`;
+                        const topic = unitResources.topics.find(t => t.id === topicId);
+                        if (topic && topic.videos && topic.videos.length > 0) {
+                            resourceInfo = `<span style="color: #4CAF50;">📹 ${topic.videos.length} video${topic.videos.length > 1 ? 's' : ''}</span>`;
+                        }
+                    }
+
+                    lessonButtonsHtml += `
+                        <button onclick="loadLesson('${lessonNum}')"
+                                class="lesson-btn ${isCompleted ? 'completed' : ''}"
+                                id="${buttonId}">
+                            ${displayName}<br>
+                            <small>${questions.length} questions</small>
+                            ${resourceInfo ? `<br><small>${resourceInfo}</small>` : ''}
+                        </button>
+                    `;
+                });
+
+                questionsContainer.innerHTML = `
+                    <button onclick="backToUnits()" class="back-button">← Back to Units</button>
+                    <div class="lesson-selector">
+                        <h3>Unit ${currentUnit}: ${unitStructure[currentUnit]?.name || 'Unknown Unit'}</h3>
+                        <p>Select a lesson to begin:</p>
+                        <div class="lesson-buttons">
+                            ${lessonButtonsHtml}
+                        </div>
+                    </div>
+                    <div class="export-section">
+                        <button id="syncBtn" class="control-btn">
+                            <i class="fas fa-sync"></i>
+                            Sync
+                        </button>
+                        <input type="file" id="importFile" accept=".json" style="display: none;">
+                    </div>
+
+                    <!-- Sync Modal -->
+                    <div id="syncModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <span class="close-modal">&times;</span>
+                            <h2>Sync Options</h2>
+                            <div class="sync-buttons">
+                                <button id="exportBtn" class="modal-btn">
+                                    <i class="fas fa-download"></i>
+                                    Export
+                                </button>
+                                <button id="importBtn" class="modal-btn">
+                                    <i class="fas fa-upload"></i>
+                                    Import
+                                </button>
+                                <button id="totalExportBtn" class="modal-btn">
+                                    <i class="fas fa-database"></i>
+                                    Total Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Modified loadLesson to show video resources at the top
+        window.loadLessonWithResources = async function(lessonNumber) {
+            currentLesson = lessonNumber;
+
+            // Get questions for this lesson
+            if (lessonNumber === 'PC') {
+                currentQuestions = allUnitQuestions.filter(q => q.id.includes('-PC-'));
+            } else {
+                const lessonNum = parseInt(lessonNumber);
+                currentQuestions = allUnitQuestions.filter(q => {
+                    if (q.id.includes('-PC-')) return false;
+                    const match = q.id.match(/U\d+-L(\d+)-/);
+                    return match && parseInt(match[1]) === lessonNum;
+                });
+            }
+
+            if (currentQuestions.length === 0) {
+                showMessage(`No questions found for Lesson ${lessonNumber}`, 'error');
+                return;
+            }
+
+            // Get resources for this lesson
+            const resources = await loadUnitResources();
+            let videoSection = '';
+
+            if (resources && lessonNumber !== 'PC') {
+                const unitResources = resources.find(u => u.unitId === `unit${currentUnit}`);
+                if (unitResources) {
+                    const topicId = `${currentUnit}-${lessonNumber}`;
+                    const topic = unitResources.topics.find(t => t.id === topicId);
+
+                    if (topic) {
+                        videoSection = `
+                            <div class="resources-section">
+                                <h3>📚 Lesson Resources: ${topic.description}</h3>
+                        `;
+
+                        if (topic.videos && topic.videos.length > 0) {
+                            videoSection += '<div class="video-resources">';
+                            topic.videos.forEach((video, index) => {
+                                videoSection += `
+                                    <div class="video-item">
+                                        <span class="video-number">Video ${index + 1}:</span>
+                                        <a href="${video.url}" target="_blank" class="video-link">
+                                            AP Classroom Video 📹
+                                        </a>
+                                        ${video.altUrl ? `
+                                            <a href="${video.altUrl}" target="_blank" class="video-link alt">
+                                                Alternative Link 🔗
+                                            </a>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            });
+                            videoSection += '</div>';
+                        }
+
+                        videoSection += '</div>';
+                    }
+                }
+            }
+
+            // Render quiz with resources
+            const questionsContainer = document.getElementById('questionsContainer');
+            questionsContainer.innerHTML = `
+                <button onclick="backToLessons()" class="back-button">← Back to Lessons</button>
+                <div class="app-controls">
+                    <div style="flex: 1;">
+                        <strong>Unit ${currentUnit}, Lesson ${currentLesson}</strong> - ${currentQuestions.length} questions
+                    </div>
+                    <button id="syncBtn" class="control-btn">
+                        <i class="fas fa-sync"></i>
+                        Sync
+                    </button>
+                    <input type="file" id="importFile" accept=".json" style="display: none;">
+                </div>
+
+                <!-- Sync Modal -->
+                <div id="syncModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <span class="close-modal">&times;</span>
+                        <h2>Sync Options</h2>
+                        <div class="sync-buttons">
+                            <button id="exportBtn" class="modal-btn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                            <button id="importBtn" class="modal-btn">
+                                <i class="fas fa-upload"></i>
+                                Import
+                            </button>
+                            <button id="totalExportBtn" class="modal-btn">
+                                <i class="fas fa-database"></i>
+                                Total Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ${videoSection}
+                <div id="questions-list"></div>
+                <div class="loading-msg" id="loading-msg" style="display:none;">Loading questions...</div>
+            `;
+
+            const questionsList = document.getElementById('questions-list');
+            document.getElementById('loading-msg').style.display = 'block';
+
+            setTimeout(() => {
+                currentQuestions.forEach((question, index) => {
+                    const questionHtml = renderQuestion(question, index);
+                    questionsList.insertAdjacentHTML('beforeend', questionHtml);
+                });
+
+                document.getElementById('loading-msg').style.display = 'none';
+                loadProgress();
+
+                if (window.MathJax) {
+                    MathJax.typesetPromise().catch(e => console.log('MathJax error:', e));
+                }
+
+                setTimeout(renderVisibleCharts, 100);
+            }, 100);
+        }
+
+        // Add styles for the resources section
+        const resourceStyles = `
+        .resources-section {
+            background: #f0f7ff;
+            border: 2px solid #2196F3;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .resources-section h3 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+
+        .video-resources {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .video-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .video-number {
+            font-weight: bold;
+            color: #666;
+            min-width: 70px;
+        }
+
+        .video-link {
+            padding: 6px 12px;
+            background: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .video-link:hover {
+            background: #45a049;
+        }
+
+        .video-link.alt {
+            background: #ff9800;
+        }
+
+        .video-link.alt:hover {
+            background: #f57c00;
+        }
+
+        body.dark-theme .resources-section {
+            background: #1e3a5f;
+            border-color: #5BC0EB;
+        }
+
+        body.dark-theme .resources-section h3 {
+            color: #5BC0EB;
+        }
+
+        body.dark-theme .video-item {
+            background: #2d2d2d;
+            border-color: #444;
+        }
+
+        /* Modal button styles */
+        .sync-buttons .modal-btn {
+            padding: 10px 20px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .sync-buttons .modal-btn:hover {
+            background: #1976D2;
+        }
+
+        .sync-buttons .modal-btn i {
+            font-size: 16px;
+        }
+        `;
+
+        // Add the styles
+        document.head.insertAdjacentHTML('beforeend', `<style>${resourceStyles}</style>`);
+
+        // Update the original functions to use the resource-aware versions
+        window.renderLessonSelector = renderLessonSelectorWithResources;
+        window.loadLesson = loadLessonWithResources;
+
+        // Sync modal handlers
+        window.openSyncModal = function() {
+            const modal = document.getElementById('syncModal');
+            if (modal) {
+                modal.style.display = 'block';
+            }
+        }
+
+        window.closeSyncModal = function() {
+            const modal = document.getElementById('syncModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Close modal when clicking outside or on close button
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('syncModal');
+            if (event.target === modal || event.target.classList.contains('close-modal')) {
+                closeSyncModal();
+            }
+        });
+
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle tab clicks
+            const tabs = document.querySelectorAll('.sync-tab');
+            const tabContents = document.querySelectorAll('.sync-tab-content');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and contents
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(tc => tc.classList.remove('active'));
+
+                    // Add active class to clicked tab
+                    tab.classList.add('active');
+
+                    // Show corresponding content
+                    const tabName = tab.getAttribute('data-tab');
+                    if (tabName === 'local') {
+                        document.getElementById('localSyncTab').classList.add('active');
+                    } else if (tabName === 'cloud') {
+                        document.getElementById('cloudSyncTab').classList.add('active');
+                        // Update cloud sync stats when tab is opened
+                        if (window.cloudSync) {
+                            cloudSync.updateSyncStats();
+                        }
+                    }
+                });
+            });
+
+            // Handle auto-sync toggle
+            const autoSyncToggle = document.getElementById('autoSyncToggle');
+            if (autoSyncToggle) {
+                autoSyncToggle.addEventListener('change', function() {
+                    if (window.cloudSync) {
+                        cloudSync.toggleAutoSync();
+                    }
+                    document.getElementById('autoSyncStatus').textContent =
+                        this.checked ? 'ON' : 'OFF';
+                });
+            }
+
+            // Two-way sync button
+            document.getElementById('syncBothWaysBtn')?.addEventListener('click', async function() {
+                if (window.cloudSync) {
+                    this.disabled = true;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+
+                    try {
+                        await cloudSync.pushToCloud();
+                        setTimeout(async () => {
+                            await cloudSync.pullFromCloud();
+                            this.innerHTML = '<i class="fas fa-sync-alt"></i><span><strong>Two-Way Sync</strong><small>Merge local and cloud data</small></span>';
+                            this.disabled = false;
+                        }, 1000);
+                    } catch (error) {
+                        console.error('Two-way sync failed:', error);
+                        this.innerHTML = '<i class="fas fa-sync-alt"></i><span><strong>Two-Way Sync</strong><small>Merge local and cloud data</small></span>';
+                        this.disabled = false;
+                    }
+                }
+            });
+        });
+
+        // Sync button functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle sync button clicks
+            document.addEventListener('click', function(event) {
+                if (event.target.id === 'syncBtn' || event.target.closest('#syncBtn')) {
+                    const modal = document.getElementById('syncModal');
+                    if (modal) {
+                        modal.style.display = 'block';
+                        // Always start with local sync tab
+                        document.querySelector('.sync-tab[data-tab="local"]')?.click();
+                    }
+                }
+            });
+
+            // Handle export button click
+            document.addEventListener('click', function(event) {
+                if (event.target.id === 'exportBtn' || event.target.closest('#exportBtn')) {
+                    exportPersonal();
+                    closeSyncModal();
+                }
+            });
+
+            // Handle import button click
+            document.addEventListener('click', function(event) {
+                if (event.target.id === 'importBtn' || event.target.closest('#importBtn')) {
+                    document.getElementById('importFile').click();
+                    closeSyncModal();
+                }
+            });
+
+            // Handle total export button click
+            document.addEventListener('click', function(event) {
+                if (event.target.id === 'totalExportBtn' || event.target.closest('#totalExportBtn')) {
+                    exportMasterData();
+                    closeSyncModal();
+                }
+            });
+        });
+
+        // Update references from masterExportBtn to totalExportBtn
+        window.exportMasterData = window.exportMasterData || function() {
+            // Get ALL data from localStorage, not filtered by user
+            const masterData = {
+                exportTime: new Date().toISOString(),
+                exportType: 'master_database',
+                allUsers: Object.keys(localStorage)
+                    .filter(key => key.includes('_username') || key.includes('answers_'))
+                    .map(key => key.split('_')[1])
+                    .filter((v, i, a) => a.indexOf(v) === i), // unique usernames
+
+                // Get all class data without filtering
+                classData: JSON.parse(localStorage.getItem('classData') || '{}'),
+
+                // Get all answers from all users
+                allAnswers: {},
+                allProgress: {},
+
+                // Include raw localStorage for complete backup
+                rawLocalStorage: {}
+            };
+
+            // Collect all answers for all users
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('answers_')) {
+                    const username = key.replace('answers_', '');
+                    masterData.allAnswers[username] = JSON.parse(localStorage.getItem(key) || '{}');
+                }
+                if (key.startsWith('progress_')) {
+                    const username = key.replace('progress_', '');
+                    masterData.allProgress[username] = JSON.parse(localStorage.getItem(key) || '{}');
+                }
+                masterData.rawLocalStorage[key] = localStorage.getItem(key);
+            });
+
+            // Create and download the file
+            const blob = new Blob([JSON.stringify(masterData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `master_database_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showMessage('Master database exported successfully!', 'success');
+        }
+
+        class CloudSyncManager {
+            constructor() {
+                // Initialize Supabase
+                this.supabaseUrl = 'https://zhsxokanfnospvujkegn.supabase.co';
+                this.supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpoc3hva2FuZm5vc3B2dWprZWduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NTIwMDIsImV4cCI6MjA3MzUyODAwMn0.LMfB-MUMn7Tev2LQjjCZYdBJyGUODQ3RZJkKHmOBsQE';
+                this.supabase = supabase.createClient(this.supabaseUrl, this.supabaseKey);
+
+                this.lastSyncTime = localStorage.getItem('lastSyncTime') || null;
+                this.autoSyncInterval = null;
+                this.syncInProgress = false;
+                this.deviceId = this.getOrCreateDeviceId();
+
+                // Remove or comment out the standalone UI initialization
+                // this.initializeUI();  // REMOVE THIS LINE
+
+                // Instead, just set up the event listeners for the modal buttons
+                this.initializeModalButtons();
+                this.updateSyncStats();
+            }
+
+            getOrCreateDeviceId() {
+                let deviceId = localStorage.getItem('deviceId');
+                if (!deviceId) {
+                    deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('deviceId', deviceId);
+                }
+                return deviceId;
+            }
+
+            initializeUI() {
+                // Update last sync time display
+                if (this.lastSyncTime) {
+                    document.getElementById('lastSyncTime').textContent =
+                        new Date(this.lastSyncTime).toLocaleString();
+                }
+
+                // Push to cloud
+                document.getElementById('pushToCloudBtn').addEventListener('click', () => {
+                    this.pushToCloud();
+                });
+
+                // Pull from cloud
+                document.getElementById('pullFromCloudBtn').addEventListener('click', () => {
+                    this.pullFromCloud();
+                });
+
+                // Auto-sync toggle
+                document.getElementById('autoSyncToggle').addEventListener('click', () => {
+                    this.toggleAutoSync();
+                });
+
+                // Check if auto-sync was enabled
+                if (localStorage.getItem('autoSync') === 'true') {
+                    this.toggleAutoSync();
+                }
+            }
+
+            initializeModalButtons() {
+                // Update last sync time display
+                if (this.lastSyncTime) {
+                    const lastSyncElement = document.getElementById('lastSyncTime');
+                    if (lastSyncElement) {
+                        lastSyncElement.textContent = new Date(this.lastSyncTime).toLocaleString();
+                    }
+                }
+
+                // Push to cloud button
+                document.getElementById('pushToCloudBtn')?.addEventListener('click', () => {
+                    this.pushToCloud();
+                });
+
+                // Pull from cloud button
+                document.getElementById('pullFromCloudBtn')?.addEventListener('click', () => {
+                    this.pullFromCloud();
+                });
+
+                // Check auto-sync status
+                const autoSyncEnabled = localStorage.getItem('autoSync') === 'true';
+                const autoSyncToggle = document.getElementById('autoSyncToggle');
+                if (autoSyncToggle) {
+                    autoSyncToggle.checked = autoSyncEnabled;
+                    document.getElementById('autoSyncStatus').textContent = autoSyncEnabled ? 'ON' : 'OFF';
+
+                    if (autoSyncEnabled) {
+                        this.startAutoSync();
+                    }
+                }
+            }
+
+            async pushToCloud() {
+                if (this.syncInProgress) return;
+                this.syncInProgress = true;
+
+                const pushBtn = document.getElementById('pushToCloudBtn');
+                pushBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pushing...';
+                pushBtn.disabled = true;
+
+                try {
+                    const localRecords = this.getLocalRecords();
+                    const recordsToInsert = [];
+
+                    // Convert all local records to cloud format
+                    for (const [username, userRecords] of Object.entries(localRecords)) {
+                        for (const record of userRecords) {
+                            // Check if already exists
+                            const exists = await this.checkRecordExists(username, record.timestamp);
+
+                            if (!exists) {
+                                recordsToInsert.push({
+                                    username: username,
+                                    student_name: record.name,
+                                    timestamp: record.timestamp,
+                                    type: record.type,
+                                    device_id: this.deviceId
+                                });
+                            }
+                        }
+                    }
+
+                    if (recordsToInsert.length > 0) {
+                        const { error } = await this.supabase
+                            .from('attendance_sync')
+                            .insert(recordsToInsert);
+
+                        if (error) throw error;
+
+                        this.showNotification(`✅ Pushed ${recordsToInsert.length} new records!`, 'success');
+                    } else {
+                        this.showNotification('✅ All records already synced!', 'info');
+                    }
+
+                    this.updateLastSyncTime();
+                    await this.updateSyncStats();
+
+                } catch (error) {
+                    console.error('Push error:', error);
+                    this.showNotification('❌ Push failed: ' + error.message, 'error');
+                } finally {
+                    pushBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Push to Cloud';
+                    pushBtn.disabled = false;
+                    this.syncInProgress = false;
+                }
+            }
+
+            async pullFromCloud() {
+                if (this.syncInProgress) return;
+                this.syncInProgress = true;
+
+                const pullBtn = document.getElementById('pullFromCloudBtn');
+                pullBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pulling...';
+                pullBtn.disabled = true;
+
+                try {
+                    // Get ALL records from cloud (no class filtering!)
+                    const { data, error } = await this.supabase
+                        .from('attendance_sync')
+                        .select('*')
+                        .order('timestamp', { ascending: true });
+
+                    if (error) throw error;
+
+                    let mergedCount = 0;
+                    if (data && data.length > 0) {
+                        for (const record of data) {
+                            if (this.mergeRecord(record)) {
+                                mergedCount++;
+                            }
+                        }
+
+                        if (mergedCount > 0) {
+                            this.showNotification(`✅ Merged ${mergedCount} new records!`, 'success');
+                            updateDisplay(); // Update the main display
+                            updateStats();   // Update statistics
+                        } else {
+                            this.showNotification('✅ All cloud records already in local!', 'info');
+                        }
+                    } else {
+                        this.showNotification('☁️ No records in cloud yet', 'info');
+                    }
+
+                    this.updateLastSyncTime();
+                    await this.updateSyncStats();
+
+                } catch (error) {
+                    console.error('Pull error:', error);
+                    this.showNotification('❌ Pull failed: ' + error.message, 'error');
+                } finally {
+                    pullBtn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Pull from Cloud';
+                    pullBtn.disabled = false;
+                    this.syncInProgress = false;
+                }
+            }
+
+            mergeRecord(cloudRecord) {
+                let records = JSON.parse(localStorage.getItem('attendanceRecords')) || {};
+
+                const username = cloudRecord.username;
+                if (!records[username]) {
+                    records[username] = [];
+                }
+
+                // Check if record already exists
+                const exists = records[username].some(r =>
+                    r.timestamp === cloudRecord.timestamp &&
+                    r.type === cloudRecord.type
+                );
+
+                if (!exists) {
+                    records[username].push({
+                        name: cloudRecord.student_name,
+                        timestamp: cloudRecord.timestamp,
+                        type: cloudRecord.type
+                    });
+
+                    // Sort by timestamp
+                    records[username].sort((a, b) =>
+                        new Date(a.timestamp) - new Date(b.timestamp)
+                    );
+
+                    localStorage.setItem('attendanceRecords', JSON.stringify(records));
+
+                    // Update global variable
+                    if (typeof window.records !== 'undefined') {
+                        window.records = records;
+                    }
+
+                    return true;
+                }
+
+                return false;
+            }
+
+            async checkRecordExists(username, timestamp) {
+                const { data } = await this.supabase
+                    .from('attendance_sync')
+                    .select('id')
+                    .eq('username', username)
+                    .eq('timestamp', timestamp)
+                    .limit(1);
+
+                return data && data.length > 0;
+            }
+
+            getLocalRecords() {
+                return JSON.parse(localStorage.getItem('attendanceRecords')) || {};
+            }
+
+            async updateSyncStats() {
+                try {
+                    // Count local records
+                    const localRecords = this.getLocalRecords();
+                    let localCount = 0;
+                    for (const userRecords of Object.values(localRecords)) {
+                        localCount += userRecords.length;
+                    }
+                    document.getElementById('localRecordCount').textContent = localCount;
+
+                    // Count ALL cloud records
+                    const { count: cloudCount } = await this.supabase
+                        .from('attendance_sync')
+                        .select('*', { count: 'exact', head: true });
+
+                    document.getElementById('cloudRecordCount').textContent = cloudCount || 0;
+
+                    // Count unique users
+                    const { data: users } = await this.supabase
+                        .from('attendance_sync')
+                        .select('username');
+
+                    const uniqueUsers = new Set(users?.map(u => u.username) || []);
+                    document.getElementById('totalUserCount').textContent = uniqueUsers.size;
+
+                } catch (error) {
+                    console.error('Error updating stats:', error);
+                }
+            }
+
+            toggleAutoSync() {
+                if (this.autoSyncInterval) {
+                    // Turn OFF auto-sync
+                    clearInterval(this.autoSyncInterval);
+                    this.autoSyncInterval = null;
+                    document.getElementById('autoSyncStatus').textContent = 'OFF';
+                    document.getElementById('autoSyncToggle').classList.remove('active');
+                    localStorage.setItem('autoSync', 'false');
+                    this.showNotification('Auto-sync disabled', 'info');
+                } else {
+                    // Turn ON auto-sync - sync every 30 seconds
+                    this.autoSyncInterval = setInterval(() => {
+                        this.performAutoSync();
+                    }, 30000);
+
+                    document.getElementById('autoSyncStatus').textContent = 'ON';
+                    document.getElementById('autoSyncToggle').classList.add('active');
+                    localStorage.setItem('autoSync', 'true');
+                    this.showNotification('Auto-sync enabled (every 30s)', 'success');
+
+                    // Do immediate sync
+                    this.performAutoSync();
+                }
+            }
+
+            async performAutoSync() {
+                // Push first, then pull
+                await this.pushToCloud();
+                setTimeout(() => this.pullFromCloud(), 2000);
+            }
+
+            updateLastSyncTime() {
+                this.lastSyncTime = new Date().toISOString();
+                localStorage.setItem('lastSyncTime', this.lastSyncTime);
+                document.getElementById('lastSyncTime').textContent =
+                    new Date(this.lastSyncTime).toLocaleString();
+            }
+
+            showNotification(message, type = 'info') {
+                // Create a simple notification
+                const notification = document.createElement('div');
+                notification.className = `sync-notification ${type}`;
+                notification.textContent = message;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 12px 20px;
+                    border-radius: 4px;
+                    z-index: 10000;
+                    animation: slideIn 0.3s ease;
+                    background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+                    color: white;
+                `;
+
+                document.body.appendChild(notification);
+
+                setTimeout(() => {
+                    notification.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
+            }
+        }
+
+        // Initialize cloud sync when page loads
+        let cloudSync;
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize after a short delay to ensure other components are ready
+            setTimeout(() => {
+                cloudSync = new CloudSyncManager();
+            }, 1000);
+        });
+
+    </script>
+</body>
+</html>
