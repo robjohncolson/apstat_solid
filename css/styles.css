@@ -1925,8 +1925,8 @@ background: #333;
 border-color: #ff69b4;
 }
 
-/* Excel Import Modal Styles */
-.excel-import-steps {
+/* CSV Import Modal Styles */
+.csv-import-steps {
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -1964,7 +1964,7 @@ border-color: #ff69b4;
     margin-top: 5px;
 }
 
-.excel-import-actions {
+.csv-import-actions {
     margin-top: 20px;
     text-align: center;
     display: flex;

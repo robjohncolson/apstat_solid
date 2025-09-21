@@ -9,7 +9,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="js/charts.js"></script>
 
 </head>
@@ -22,7 +21,6 @@
 
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
     <button class="sync-button" onclick="showSyncModal()" title="Sync & Export Data">⚡</button>
-    <button class="user-button" onclick="showUserManagement()" title="Switch User" style="display: none;">👤</button>
 <script src="data/curriculum.js"></script>
     <script src="data/units.js"></script>
     <script>
@@ -255,6 +253,7 @@
             if (savedUsername) {
                 currentUsername = savedUsername;
                 initClassData();
+                initializeProgressTracking(); // Initialize progress tracking for returning user
                 showUsernameWelcome();
                 initializeFromEmbeddedData(); // Initialize from embedded data
                 updateCurrentUsernameDisplay();
@@ -309,14 +308,14 @@
                                 </button>
                             </div>
 
-                            <!-- Excel Import -->
+                            <!-- CSV Import -->
                             <div class="recovery-option">
                                 <div class="option-icon">📊</div>
-                                <h3>Import with Excel Mapping</h3>
-                                <p class="option-description">Import master data using Excel student roster</p>
-                                <button onclick="showExcelImportModal()"
+                                <h3>Import with CSV Mapping</h3>
+                                <p class="option-description">Import master data using CSV student roster</p>
+                                <button onclick="showCSVImportModal()"
                                         class="action-button secondary">
-                                    Excel Import
+                                    CSV Import
                                 </button>
                             </div>
 
@@ -384,6 +383,7 @@
             currentUsername = name;
             localStorage.setItem('consensusUsername', currentUsername);
             initClassData();
+            initializeProgressTracking(); // Initialize progress tracking for new session
             showUsernameWelcome();
             initializeFromEmbeddedData();
             updateCurrentUsernameDisplay();
@@ -629,23 +629,23 @@
             }
         }
 
-        // Excel Integration Functions
-        let excelMappingData = null;
-        let masterDataForExcel = null;
+        // CSV Integration Functions
+        let csvMappingData = null;
+        let masterDataForCSV = null;
 
-        window.showExcelImportModal = function() {
+        window.showCSVImportModal = function() {
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.display = 'block';
-            modal.id = 'excelImportModal';
+            modal.id = 'csvImportModal';
 
             modal.innerHTML = `
                 <div class="modal-content">
-                    <span class="close-modal" onclick="closeExcelImportModal()">&times;</span>
-                    <h3>📊 Excel Import Setup</h3>
-                    <p>Import master class data with Excel student mapping</p>
+                    <span class="close-modal" onclick="closeCSVImportModal()">&times;</span>
+                    <h3>📊 CSV Import Setup</h3>
+                    <p>Import master class data with CSV student mapping</p>
 
-                    <div class="excel-import-steps">
+                    <div class="csv-import-steps">
                         <div class="import-step">
                             <h4>Step 1: Select Master Data File</h4>
                             <p>Choose your exported class data (JSON file)</p>
@@ -657,31 +657,32 @@
                         </div>
 
                         <div class="import-step">
-                            <h4>Step 2: Select Excel Student Roster</h4>
-                            <p>Choose Excel file with student names and usernames</p>
+                            <h4>Step 2: Select CSV Student Roster</h4>
+                            <p>Choose CSV file with student names and usernames<br>
+                               <small>Format: Student Name, Username (comma-separated)</small></p>
                             <input type="file"
-                                   id="excelMappingFile"
-                                   accept=".xlsx,.xls"
-                                   onchange="loadExcelMappingFile(event)">
-                            <div id="excelMappingStatus" class="file-status"></div>
+                                   id="csvMappingFile"
+                                   accept=".csv"
+                                   onchange="loadCSVMappingFile(event)">
+                            <div id="csvMappingStatus" class="file-status"></div>
                         </div>
 
                         <div class="import-step">
                             <h4>Step 3: Select Your Name</h4>
-                            <p>Choose your name from the Excel roster</p>
+                            <p>Choose your name from the CSV roster</p>
                             <select id="studentNameSelect" disabled>
-                                <option value="">Load Excel file first...</option>
+                                <option value="">Load CSV file first...</option>
                             </select>
                         </div>
 
-                        <div class="excel-import-actions">
-                            <button onclick="processExcelImport()"
-                                    id="processExcelImportBtn"
+                        <div class="csv-import-actions">
+                            <button onclick="processCSVImport()"
+                                    id="processCSVImportBtn"
                                     class="action-button primary"
                                     disabled>
                                 Import Data
                             </button>
-                            <button onclick="closeExcelImportModal()"
+                            <button onclick="closeCSVImportModal()"
                                     class="action-button secondary">
                                 Cancel
                             </button>
@@ -693,13 +694,13 @@
             document.body.appendChild(modal);
         }
 
-        window.closeExcelImportModal = function() {
-            const modal = document.getElementById('excelImportModal');
+        window.closeCSVImportModal = function() {
+            const modal = document.getElementById('csvImportModal');
             if (modal) {
                 modal.remove();
             }
-            excelMappingData = null;
-            masterDataForExcel = null;
+            csvMappingData = null;
+            masterDataForCSV = null;
         }
 
         window.loadMasterDataFile = function(event) {
@@ -709,76 +710,67 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    masterDataForExcel = JSON.parse(e.target.result);
+                    masterDataForCSV = JSON.parse(e.target.result);
                     document.getElementById('masterDataStatus').innerHTML =
-                        `<span style="color: green;">✓ Master data loaded (${Object.keys(masterDataForExcel.students || masterDataForExcel.allUsers || {}).length} students)</span>`;
-                    checkExcelImportReady();
+                        `<span style="color: green;">✓ Master data loaded (${Object.keys(masterDataForCSV.students || masterDataForCSV.allUsers || {}).length} students)</span>`;
+                    checkCSVImportReady();
                 } catch (error) {
                     document.getElementById('masterDataStatus').innerHTML =
                         `<span style="color: red;">✗ Invalid JSON file</span>`;
-                    masterDataForExcel = null;
+                    masterDataForCSV = null;
                 }
             };
             reader.readAsText(file);
         }
 
-        window.loadExcelMappingFile = function(event) {
+        window.loadCSVMappingFile = function(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    const csvText = e.target.result;
+                    csvMappingData = parseCSVMapping(csvText);
 
-                    // Parse Excel data - expect columns like: Name, Username or Student Name, AP Stats Username
-                    excelMappingData = parseExcelMapping(jsonData);
-
-                    if (excelMappingData && excelMappingData.length > 0) {
-                        populateStudentSelect(excelMappingData);
-                        document.getElementById('excelMappingStatus').innerHTML =
-                            `<span style="color: green;">✓ Excel loaded (${excelMappingData.length} students)</span>`;
-                        checkExcelImportReady();
+                    if (csvMappingData && csvMappingData.length > 0) {
+                        populateStudentSelect(csvMappingData);
+                        document.getElementById('csvMappingStatus').innerHTML =
+                            `<span style="color: green;">✓ CSV loaded (${csvMappingData.length} students)</span>`;
+                        checkCSVImportReady();
                     } else {
-                        document.getElementById('excelMappingStatus').innerHTML =
-                            `<span style="color: red;">✗ No student data found. Check Excel format.</span>`;
+                        document.getElementById('csvMappingStatus').innerHTML =
+                            `<span style="color: red;">✗ No student data found. Check CSV format.</span>`;
                     }
                 } catch (error) {
-                    document.getElementById('excelMappingStatus').innerHTML =
-                        `<span style="color: red;">✗ Error reading Excel file</span>`;
-                    excelMappingData = null;
+                    document.getElementById('csvMappingStatus').innerHTML =
+                        `<span style="color: red;">✗ Error reading CSV file</span>`;
+                    csvMappingData = null;
                 }
             };
-            reader.readAsArrayBuffer(file);
+            reader.readAsText(file);
         }
 
-        function parseExcelMapping(jsonData) {
-            if (!jsonData || jsonData.length < 2) return null;
+        function parseCSVMapping(csvText) {
+            const lines = csvText.trim().split('\n');
+            if (lines.length < 1) return null;
 
-            const headers = jsonData[0].map(h => h.toString().toLowerCase());
-            const nameColIndex = headers.findIndex(h =>
-                h.includes('name') || h.includes('student')
-            );
-            const usernameColIndex = headers.findIndex(h =>
-                h.includes('username') || h.includes('user') || h.includes('ap')
-            );
+            const students = [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
 
-            if (nameColIndex === -1 || usernameColIndex === -1) {
-                // Try default columns if headers not found
-                return jsonData.slice(1).map(row => ({
-                    name: row[0] || '',
-                    username: row[1] || ''
-                })).filter(item => item.name && item.username);
+                // Split by comma and clean up the values
+                const parts = line.split(',').map(part => part.trim().replace(/^["']|["']$/g, ''));
+                if (parts.length >= 2 && parts[0] && parts[1]) {
+                    students.push({
+                        name: parts[0],
+                        username: parts[1]
+                    });
+                }
             }
 
-            return jsonData.slice(1).map(row => ({
-                name: row[nameColIndex] || '',
-                username: row[usernameColIndex] || ''
-            })).filter(item => item.name && item.username);
+            return students.length > 0 ? students : null;
         }
 
         function populateStudentSelect(mappingData) {
@@ -795,30 +787,81 @@
             select.disabled = false;
         }
 
-        function checkExcelImportReady() {
-            const btn = document.getElementById('processExcelImportBtn');
-            if (masterDataForExcel && excelMappingData) {
+        function checkCSVImportReady() {
+            const btn = document.getElementById('processCSVImportBtn');
+            if (masterDataForCSV && csvMappingData) {
                 btn.disabled = false;
             }
         }
 
-        window.processExcelImport = function() {
+        window.processCSVImport = function() {
             const selectedIndex = document.getElementById('studentNameSelect').value;
-            if (!selectedIndex || !excelMappingData || !masterDataForExcel) {
+            if (!selectedIndex || !csvMappingData || !masterDataForCSV) {
                 showMessage('Please complete all steps first', 'error');
                 return;
             }
 
-            const selectedStudent = excelMappingData[selectedIndex];
+            const selectedStudent = csvMappingData[selectedIndex];
             const username = selectedStudent.username;
 
             // Close modal
-            closeExcelImportModal();
+            closeCSVImportModal();
 
             // Import data for the selected user
             showMessage(`Importing data for ${selectedStudent.name} (${username})...`, 'info');
-            importDataForUser(username, masterDataForExcel);
+            importDataForUser(username, masterDataForCSV);
         }
+
+        // Global ESC Key Handler for All Modals
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                // Find any open modal and close it
+                const modals = [
+                    'unifiedSyncModal',
+                    'csvImportModal',
+                    'userManagementModal'
+                ];
+
+                for (const modalId of modals) {
+                    const modal = document.getElementById(modalId);
+                    if (modal && modal.style.display !== 'none') {
+                        // Close the modal using the appropriate close function
+                        switch (modalId) {
+                            case 'unifiedSyncModal':
+                                closeSyncModal();
+                                break;
+                            case 'csvImportModal':
+                                closeCSVImportModal();
+                                break;
+                            case 'userManagementModal':
+                                closeUserManagement();
+                                break;
+                        }
+                        event.preventDefault();
+                        break; // Only close one modal at a time
+                    }
+                }
+
+                // Also check for any generic modals with class 'modal'
+                const genericModals = document.querySelectorAll('.modal');
+                for (const modal of genericModals) {
+                    if (modal.style.display !== 'none' && modal.offsetParent !== null) {
+                        // Try to find a close button and click it
+                        const closeBtn = modal.querySelector('.close-modal');
+                        if (closeBtn) {
+                            closeBtn.click();
+                            event.preventDefault();
+                            break;
+                        } else {
+                            // Fallback: just hide the modal
+                            modal.style.display = 'none';
+                            event.preventDefault();
+                            break;
+                        }
+                    }
+                }
+            }
+        });
 
         // Unified Sync Modal System
         window.showSyncModal = function() {
@@ -872,11 +915,11 @@
                                         <small>Export all student data</small>
                                     </span>
                                 </button>
-                                <button onclick="showExcelImportModal(); closeSyncModal();" class="sync-btn excel">
+                                <button onclick="document.getElementById('syncImportFile').click(); closeSyncModal();" class="sync-btn master">
                                     <span class="btn-icon">📊</span>
                                     <span class="btn-text">
-                                        <strong>Excel Import</strong>
-                                        <small>Import with student roster</small>
+                                        <strong>Master Import</strong>
+                                        <small>Import class data file</small>
                                     </span>
                                 </button>
                             </div>
@@ -909,161 +952,10 @@
             }
         }
 
-        // User Management System
-        window.showUserManagement = function() {
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'block';
-            modal.id = 'userManagementModal';
 
-            // Get recent usernames and existing users from localStorage
-            const recentUsernames = JSON.parse(localStorage.getItem('recentUsernames') || '[]');
-            const allUsernames = [];
-
-            // Scan localStorage for all known usernames
-            for (let key in localStorage) {
-                if (key.startsWith('answers_')) {
-                    const username = key.replace('answers_', '');
-                    if (!allUsernames.includes(username)) {
-                        allUsernames.push(username);
-                    }
-                }
-            }
-
-            // Also check classData for more usernames
-            const classData = JSON.parse(localStorage.getItem('classData') || '{}');
-            if (classData.users) {
-                Object.keys(classData.users).forEach(username => {
-                    if (!allUsernames.includes(username)) {
-                        allUsernames.push(username);
-                    }
-                });
-            }
-
-            const recentUsersHTML = recentUsernames.length > 0 ? `
-                <div class="user-section">
-                    <h4>📝 Recent Users</h4>
-                    <div class="username-grid">
-                        ${recentUsernames.map(username => `
-                            <button onclick="switchToUser('${username}')"
-                                    class="username-btn ${username === currentUsername ? 'current' : ''}">
-                                ${username}
-                                ${username === currentUsername ? ' (current)' : ''}
-                            </button>
-                        `).join('')}
-                    </div>
-                </div>
-            ` : '';
-
-            const allUsersHTML = allUsernames.length > 0 ? `
-                <div class="user-section">
-                    <h4>👥 All Known Users</h4>
-                    <div class="username-grid">
-                        ${allUsernames.map(username => `
-                            <button onclick="switchToUser('${username}')"
-                                    class="username-btn ${username === currentUsername ? 'current' : ''}">
-                                ${username}
-                                ${username === currentUsername ? ' (current)' : ''}
-                            </button>
-                        `).join('')}
-                    </div>
-                </div>
-            ` : '';
-
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <span class="close-modal" onclick="closeUserManagement()">&times;</span>
-                    <h2>👤 User Management</h2>
-                    <p>Switch between users or create a new one</p>
-
-                    <div class="current-user-info">
-                        <strong>Current User:</strong> <span class="current-username">${currentUsername || 'None'}</span>
-                    </div>
-
-                    ${recentUsersHTML}
-                    ${allUsersHTML}
-
-                    <div class="user-actions">
-                        <button onclick="createNewUser()" class="action-btn primary">
-                            ➕ Create New User
-                        </button>
-                        <button onclick="importExistingUser()" class="action-btn secondary">
-                            📁 Import User Data
-                        </button>
-                    </div>
-
-                    <input type="file" id="userImportFile" accept=".json" style="display: none;" onchange="importUserFromFile(event)">
-                </div>
-            `;
-
-            document.body.appendChild(modal);
-
-            // Close modal when clicking outside
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    closeUserManagement();
-                }
-            });
-        }
-
-        window.closeUserManagement = function() {
-            const modal = document.getElementById('userManagementModal');
-            if (modal) {
-                modal.remove();
-            }
-        }
-
-        window.switchToUser = function(username) {
-            if (username === currentUsername) {
-                closeUserManagement();
-                return;
-            }
-
-            // Switch to the new user without clearing localStorage
-            currentUsername = username;
-            localStorage.setItem('consensusUsername', username);
-
-            // Initialize class data for this user
-            initClassData();
-
-            // Show welcome message and initialize
-            showUsernameWelcome();
-            initializeFromEmbeddedData();
-            updateCurrentUsernameDisplay();
-
-            // Close modal
-            closeUserManagement();
-
-            showMessage(`Switched to user: ${username}`, 'success');
-        }
-
-        window.createNewUser = function() {
-            closeUserManagement();
-            // Show the username prompt to create a new user
-            showUsernamePrompt();
-        }
-
-        window.importExistingUser = function() {
-            document.getElementById('userImportFile').click();
-        }
-
-        window.importUserFromFile = function(event) {
-            closeUserManagement();
-            // Use the existing import functionality
-            importUsernameFromFile(event);
-        }
-
-        // Function to show/hide user button based on login status
-        function updateUserButtonVisibility() {
-            const userButton = document.querySelector('.user-button');
-            if (userButton) {
-                userButton.style.display = currentUsername ? 'block' : 'none';
-            }
-        }
 
         // Call this function whenever currentUsername changes
         function updateCurrentUsernameDisplay() {
-            updateUserButtonVisibility();
             // Reinitialize pig sprite with user's saved color
             if (typeof initializePigSprite === 'function') {
                 initializePigSprite();
@@ -1363,29 +1255,15 @@ function renderLessonSelector(unitInfo) {
             <input type="file" id="importFile" accept=".json" style="display: none;">
         </div>
 
-        <!-- Enhanced Sync Modal with Cloud Integration -->
+        <!-- Sync Modal -->
         <div id="syncModal" class="modal" style="display: none;">
-            <div class="modal-content enhanced-sync-modal">
+            <div class="modal-content">
                 <span class="close-modal">&times;</span>
-                <h2><i class="fas fa-sync"></i> Sync & Backup Options</h2>
+                <h2><i class="fas fa-sync"></i> Data Management</h2>
+                <p>Current user: <strong id="currentUserDisplay"></strong></p>
 
-                <!-- Tab Navigation -->
-                <div class="sync-tabs">
-                    <button class="sync-tab active" data-tab="local">
-                        <i class="fas fa-hdd"></i> Local Sync
-                    </button>
-                    <button class="sync-tab" data-tab="cloud">
-                        <i class="fas fa-cloud"></i> Cloud Sync
-                    </button>
-                </div>
-
-                <!-- Local Sync Tab -->
-                <div class="sync-tab-content active" id="localSyncTab">
-                    <div class="sync-section-header">
-                        <h3>Local File Operations</h3>
-                        <p>Export and import quiz data using JSON files</p>
-                    </div>
-
+                <div class="sync-section">
+                    <h3><i class="fas fa-user"></i> Student Actions</h3>
                     <div class="sync-buttons">
                         <button id="exportBtn" class="modal-btn">
                             <i class="fas fa-download"></i>
@@ -1401,90 +1279,31 @@ function renderLessonSelector(unitInfo) {
                                 <small>Load quiz data from file</small>
                             </span>
                         </button>
+                    </div>
+                </div>
+
+                <div class="sync-section">
+                    <h3><i class="fas fa-chalkboard-teacher"></i> Teacher Actions</h3>
+                    <div class="sync-buttons">
                         <button id="totalExportBtn" class="modal-btn">
                             <i class="fas fa-database"></i>
                             <span>
-                                <strong>Total Export</strong>
-                                <small>Export all users' data (master)</small>
+                                <strong>Master Export</strong>
+                                <small>Export all users' data</small>
+                            </span>
+                        </button>
+                        <button onclick="showCSVImportModal()" class="modal-btn">
+                            <i class="fas fa-file-csv"></i>
+                            <span>
+                                <strong>Master Import</strong>
+                                <small>Import with student roster</small>
                             </span>
                         </button>
                     </div>
                 </div>
 
-                <!-- Cloud Sync Tab -->
-                <div class="sync-tab-content" id="cloudSyncTab">
-                    <div class="sync-section-header">
-                        <h3>Cloud Synchronization</h3>
-                        <p>Sync your data across devices instantly</p>
-                    </div>
-
-                    <!-- Cloud Sync Status -->
-                    <div class="cloud-sync-status">
-                        <div class="sync-status-row">
-                            <span class="status-label">Last Sync:</span>
-                            <span class="status-value" id="lastSyncTime">Never</span>
-                        </div>
-                        <div class="sync-status-row">
-                            <span class="status-label">Auto-Sync:</span>
-                            <span class="status-value">
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="autoSyncToggle">
-                                    <span class="toggle-slider"></span>
-                                </label>
-                                <span id="autoSyncStatus">OFF</span>
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Cloud Sync Actions -->
-                    <div class="sync-buttons cloud-buttons">
-                        <button id="pushToCloudBtn" class="modal-btn cloud-btn">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <span>
-                                <strong>Push to Cloud</strong>
-                                <small>Upload local changes</small>
-                            </span>
-                        </button>
-                        <button id="pullFromCloudBtn" class="modal-btn cloud-btn">
-                            <i class="fas fa-cloud-download-alt"></i>
-                            <span>
-                                <strong>Pull from Cloud</strong>
-                                <small>Download latest data</small>
-                            </span>
-                        </button>
-                        <button id="syncBothWaysBtn" class="modal-btn cloud-btn primary">
-                            <i class="fas fa-sync-alt"></i>
-                            <span>
-                                <strong>Two-Way Sync</strong>
-                                <small>Merge local and cloud data</small>
-                            </span>
-                        </button>
-                    </div>
-
-                    <!-- Cloud Sync Stats -->
-                    <div class="cloud-sync-stats">
-                        <div class="stat-item">
-                            <i class="fas fa-desktop"></i>
-                            <div>
-                                <strong id="localRecordCount">0</strong>
-                                <small>Local Records</small>
-                            </div>
-                        </div>
-                        <div class="stat-item">
-                            <i class="fas fa-cloud"></i>
-                            <div>
-                                <strong id="cloudRecordCount">0</strong>
-                                <small>Cloud Records</small>
-                            </div>
-                        </div>
-                        <div class="stat-item">
-                            <i class="fas fa-users"></i>
-                            <div>
-                                <strong id="totalUserCount">0</strong>
-                                <small>Total Users</small>
-                            </div>
-                        </div>
-                    </div>
+                <div class="sync-footer">
+                    <small><i class="fas fa-keyboard"></i> Tip: Press Ctrl+S to quickly access sync options</small>
                 </div>
             </div>
         </div>
@@ -3369,15 +3188,134 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     this.element.style.transition = '';
                 }, 500);
 
-                // Show message and trigger username management
-                showMessage('🐷 Oink! Three bounces unlocked user management!', 'info');
+                // Show message and trigger username prompt
+                showMessage('🐷 Oink! Three bounces - returning to username screen!', 'info');
 
                 setTimeout(() => {
-                    if (typeof showUserManagement === 'function') {
-                        showUserManagement();
-                    }
+                    this.showUsernameScreenWithWarning();
                 }, 600);
             }
+
+            showUsernameScreenWithWarning() {
+                // Check if there's unsaved progress
+                const hasUnsavedProgress = this.checkForUnsavedProgress();
+
+                if (hasUnsavedProgress) {
+                    const shouldContinue = confirm(
+                        'Warning: You have unsaved progress that will be lost if you return to the username screen.\n\n' +
+                        'Do you want to continue? (Your current progress will be lost)'
+                    );
+
+                    if (!shouldContinue) {
+                        showMessage('Returning to current session - progress preserved!', 'success');
+                        return;
+                    }
+                }
+
+                // Clear current user and show username prompt
+                localStorage.removeItem('consensusUsername');
+
+                // Show username prompt
+                if (typeof showUsernamePrompt === 'function') {
+                    showUsernamePrompt();
+                } else {
+                    // Fallback to reload page
+                    location.reload();
+                }
+            }
+
+            checkForUnsavedProgress() {
+                if (!currentUsername) return false;
+
+                try {
+                    // Check for any temporary progress markers
+                    const tempProgress = localStorage.getItem(`tempProgress_${currentUsername}`);
+                    if (tempProgress) return true;
+
+                    // Check if user has answered any questions in current session that aren't saved
+                    const sessionStart = localStorage.getItem(`sessionStart_${currentUsername}`);
+                    if (!sessionStart) return false;
+
+                    const sessionStartTime = new Date(sessionStart);
+                    const userAnswers = JSON.parse(localStorage.getItem(`answers_${currentUsername}`) || '{}');
+
+                    // Check if any answers were modified since session start
+                    for (const [questionId, answerData] of Object.entries(userAnswers)) {
+                        if (answerData.timestamp && new Date(answerData.timestamp) > sessionStartTime) {
+                            // Mark unsaved progress if recent activity found
+                            localStorage.setItem(`tempProgress_${currentUsername}`, 'true');
+                            return true;
+                        }
+                    }
+
+                    return false;
+                } catch (error) {
+                    console.error('Error checking unsaved progress:', error);
+                    return false;
+                }
+            }
+        }
+
+        // Progress Tracking System
+        function initializeProgressTracking() {
+            if (!currentUsername) return;
+
+            // Set session start time
+            const now = new Date().toISOString();
+            localStorage.setItem(`sessionStart_${currentUsername}`, now);
+
+            // Clear any previous temporary progress markers
+            localStorage.removeItem(`tempProgress_${currentUsername}`);
+
+            console.log(`Progress tracking initialized for ${currentUsername} at ${now}`);
+        }
+
+        function markProgressAsUnsaved() {
+            if (!currentUsername) return;
+            localStorage.setItem(`tempProgress_${currentUsername}`, 'true');
+            console.log(`Marked progress as unsaved for ${currentUsername}`);
+        }
+
+        function markProgressAsSaved() {
+            if (!currentUsername) return;
+            localStorage.removeItem(`tempProgress_${currentUsername}`);
+            console.log(`Marked progress as saved for ${currentUsername}`);
+        }
+
+        function getProgressStatus() {
+            if (!currentUsername) return { hasUnsavedProgress: false, sessionDuration: 0 };
+
+            const sessionStart = localStorage.getItem(`sessionStart_${currentUsername}`);
+            const tempProgress = localStorage.getItem(`tempProgress_${currentUsername}`);
+
+            const sessionDuration = sessionStart ?
+                (new Date() - new Date(sessionStart)) / 1000 / 60 : 0; // minutes
+
+            return {
+                hasUnsavedProgress: !!tempProgress,
+                sessionDuration: sessionDuration,
+                sessionStart: sessionStart
+            };
+        }
+
+        // Enhanced answer saving that tracks progress
+        function saveAnswerWithTracking(questionId, answer, options = {}) {
+            if (!currentUsername) return;
+
+            // Mark progress as unsaved when user makes changes
+            markProgressAsUnsaved();
+
+            // Call existing save answer function
+            if (typeof saveAnswer === 'function') {
+                saveAnswer(questionId, answer, options);
+            }
+
+            // Auto-save progress periodically
+            clearTimeout(window.autoSaveTimeout);
+            window.autoSaveTimeout = setTimeout(() => {
+                markProgressAsSaved();
+                console.log('Auto-saved progress');
+            }, 30000); // 30 seconds delay
         }
 
         // Initialize the sprite when the page loads
@@ -4060,354 +3998,28 @@ if (chartInstances[`dotplot-${questionId}`]) {
             showMessage('Master database exported successfully!', 'success');
         }
 
-        class CloudSyncManager {
-            constructor() {
-                // Initialize Supabase
-                this.supabaseUrl = 'https://zhsxokanfnospvujkegn.supabase.co';
-                this.supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpoc3hva2FuZm5vc3B2dWprZWduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NTIwMDIsImV4cCI6MjA3MzUyODAwMn0.LMfB-MUMn7Tev2LQjjCZYdBJyGUODQ3RZJkKHmOBsQE';
-                this.supabase = supabase.createClient(this.supabaseUrl, this.supabaseKey);
-
-                this.lastSyncTime = localStorage.getItem('lastSyncTime') || null;
-                this.autoSyncInterval = null;
-                this.syncInProgress = false;
-                this.deviceId = this.getOrCreateDeviceId();
-
-                // Remove or comment out the standalone UI initialization
-                // this.initializeUI();  // REMOVE THIS LINE
-
-                // Instead, just set up the event listeners for the modal buttons
-                this.initializeModalButtons();
-                this.updateSyncStats();
-            }
-
-            getOrCreateDeviceId() {
-                let deviceId = localStorage.getItem('deviceId');
-                if (!deviceId) {
-                    deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('deviceId', deviceId);
-                }
-                return deviceId;
-            }
-
-            initializeUI() {
-                // Update last sync time display
-                if (this.lastSyncTime) {
-                    document.getElementById('lastSyncTime').textContent =
-                        new Date(this.lastSyncTime).toLocaleString();
-                }
-
-                // Push to cloud
-                document.getElementById('pushToCloudBtn').addEventListener('click', () => {
-                    this.pushToCloud();
-                });
-
-                // Pull from cloud
-                document.getElementById('pullFromCloudBtn').addEventListener('click', () => {
-                    this.pullFromCloud();
-                });
-
-                // Auto-sync toggle
-                document.getElementById('autoSyncToggle').addEventListener('click', () => {
-                    this.toggleAutoSync();
-                });
-
-                // Check if auto-sync was enabled
-                if (localStorage.getItem('autoSync') === 'true') {
-                    this.toggleAutoSync();
-                }
-            }
-
-            initializeModalButtons() {
-                // Update last sync time display
-                if (this.lastSyncTime) {
-                    const lastSyncElement = document.getElementById('lastSyncTime');
-                    if (lastSyncElement) {
-                        lastSyncElement.textContent = new Date(this.lastSyncTime).toLocaleString();
-                    }
-                }
-
-                // Push to cloud button
-                document.getElementById('pushToCloudBtn')?.addEventListener('click', () => {
-                    this.pushToCloud();
-                });
-
-                // Pull from cloud button
-                document.getElementById('pullFromCloudBtn')?.addEventListener('click', () => {
-                    this.pullFromCloud();
-                });
-
-                // Check auto-sync status
-                const autoSyncEnabled = localStorage.getItem('autoSync') === 'true';
-                const autoSyncToggle = document.getElementById('autoSyncToggle');
-                if (autoSyncToggle) {
-                    autoSyncToggle.checked = autoSyncEnabled;
-                    document.getElementById('autoSyncStatus').textContent = autoSyncEnabled ? 'ON' : 'OFF';
-
-                    if (autoSyncEnabled) {
-                        this.startAutoSync();
-                    }
-                }
-            }
-
-            async pushToCloud() {
-                if (this.syncInProgress) return;
-                this.syncInProgress = true;
-
-                const pushBtn = document.getElementById('pushToCloudBtn');
-                pushBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pushing...';
-                pushBtn.disabled = true;
-
-                try {
-                    const localRecords = this.getLocalRecords();
-                    const recordsToInsert = [];
-
-                    // Convert all local records to cloud format
-                    for (const [username, userRecords] of Object.entries(localRecords)) {
-                        for (const record of userRecords) {
-                            // Check if already exists
-                            const exists = await this.checkRecordExists(username, record.timestamp);
-
-                            if (!exists) {
-                                recordsToInsert.push({
-                                    username: username,
-                                    student_name: record.name,
-                                    timestamp: record.timestamp,
-                                    type: record.type,
-                                    device_id: this.deviceId
-                                });
-                            }
-                        }
-                    }
-
-                    if (recordsToInsert.length > 0) {
-                        const { error } = await this.supabase
-                            .from('attendance_sync')
-                            .insert(recordsToInsert);
-
-                        if (error) throw error;
-
-                        this.showNotification(`✅ Pushed ${recordsToInsert.length} new records!`, 'success');
-                    } else {
-                        this.showNotification('✅ All records already synced!', 'info');
-                    }
-
-                    this.updateLastSyncTime();
-                    await this.updateSyncStats();
-
-                } catch (error) {
-                    console.error('Push error:', error);
-                    this.showNotification('❌ Push failed: ' + error.message, 'error');
-                } finally {
-                    pushBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Push to Cloud';
-                    pushBtn.disabled = false;
-                    this.syncInProgress = false;
-                }
-            }
-
-            async pullFromCloud() {
-                if (this.syncInProgress) return;
-                this.syncInProgress = true;
-
-                const pullBtn = document.getElementById('pullFromCloudBtn');
-                pullBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pulling...';
-                pullBtn.disabled = true;
-
-                try {
-                    // Get ALL records from cloud (no class filtering!)
-                    const { data, error } = await this.supabase
-                        .from('attendance_sync')
-                        .select('*')
-                        .order('timestamp', { ascending: true });
-
-                    if (error) throw error;
-
-                    let mergedCount = 0;
-                    if (data && data.length > 0) {
-                        for (const record of data) {
-                            if (this.mergeRecord(record)) {
-                                mergedCount++;
-                            }
-                        }
-
-                        if (mergedCount > 0) {
-                            this.showNotification(`✅ Merged ${mergedCount} new records!`, 'success');
-                            updateDisplay(); // Update the main display
-                            updateStats();   // Update statistics
-                        } else {
-                            this.showNotification('✅ All cloud records already in local!', 'info');
-                        }
-                    } else {
-                        this.showNotification('☁️ No records in cloud yet', 'info');
-                    }
-
-                    this.updateLastSyncTime();
-                    await this.updateSyncStats();
-
-                } catch (error) {
-                    console.error('Pull error:', error);
-                    this.showNotification('❌ Pull failed: ' + error.message, 'error');
-                } finally {
-                    pullBtn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Pull from Cloud';
-                    pullBtn.disabled = false;
-                    this.syncInProgress = false;
-                }
-            }
-
-            mergeRecord(cloudRecord) {
-                let records = JSON.parse(localStorage.getItem('attendanceRecords')) || {};
-
-                const username = cloudRecord.username;
-                if (!records[username]) {
-                    records[username] = [];
-                }
-
-                // Check if record already exists
-                const exists = records[username].some(r =>
-                    r.timestamp === cloudRecord.timestamp &&
-                    r.type === cloudRecord.type
-                );
-
-                if (!exists) {
-                    records[username].push({
-                        name: cloudRecord.student_name,
-                        timestamp: cloudRecord.timestamp,
-                        type: cloudRecord.type
-                    });
-
-                    // Sort by timestamp
-                    records[username].sort((a, b) =>
-                        new Date(a.timestamp) - new Date(b.timestamp)
-                    );
-
-                    localStorage.setItem('attendanceRecords', JSON.stringify(records));
-
-                    // Update global variable
-                    if (typeof window.records !== 'undefined') {
-                        window.records = records;
-                    }
-
-                    return true;
-                }
-
-                return false;
-            }
-
-            async checkRecordExists(username, timestamp) {
-                const { data } = await this.supabase
-                    .from('attendance_sync')
-                    .select('id')
-                    .eq('username', username)
-                    .eq('timestamp', timestamp)
-                    .limit(1);
-
-                return data && data.length > 0;
-            }
-
-            getLocalRecords() {
-                return JSON.parse(localStorage.getItem('attendanceRecords')) || {};
-            }
-
-            async updateSyncStats() {
-                try {
-                    // Count local records
-                    const localRecords = this.getLocalRecords();
-                    let localCount = 0;
-                    for (const userRecords of Object.values(localRecords)) {
-                        localCount += userRecords.length;
-                    }
-                    document.getElementById('localRecordCount').textContent = localCount;
-
-                    // Count ALL cloud records
-                    const { count: cloudCount } = await this.supabase
-                        .from('attendance_sync')
-                        .select('*', { count: 'exact', head: true });
-
-                    document.getElementById('cloudRecordCount').textContent = cloudCount || 0;
-
-                    // Count unique users
-                    const { data: users } = await this.supabase
-                        .from('attendance_sync')
-                        .select('username');
-
-                    const uniqueUsers = new Set(users?.map(u => u.username) || []);
-                    document.getElementById('totalUserCount').textContent = uniqueUsers.size;
-
-                } catch (error) {
-                    console.error('Error updating stats:', error);
-                }
-            }
-
-            toggleAutoSync() {
-                if (this.autoSyncInterval) {
-                    // Turn OFF auto-sync
-                    clearInterval(this.autoSyncInterval);
-                    this.autoSyncInterval = null;
-                    document.getElementById('autoSyncStatus').textContent = 'OFF';
-                    document.getElementById('autoSyncToggle').classList.remove('active');
-                    localStorage.setItem('autoSync', 'false');
-                    this.showNotification('Auto-sync disabled', 'info');
-                } else {
-                    // Turn ON auto-sync - sync every 30 seconds
-                    this.autoSyncInterval = setInterval(() => {
-                        this.performAutoSync();
-                    }, 30000);
-
-                    document.getElementById('autoSyncStatus').textContent = 'ON';
-                    document.getElementById('autoSyncToggle').classList.add('active');
-                    localStorage.setItem('autoSync', 'true');
-                    this.showNotification('Auto-sync enabled (every 30s)', 'success');
-
-                    // Do immediate sync
-                    this.performAutoSync();
-                }
-            }
-
-            async performAutoSync() {
-                // Push first, then pull
-                await this.pushToCloud();
-                setTimeout(() => this.pullFromCloud(), 2000);
-            }
-
-            updateLastSyncTime() {
-                this.lastSyncTime = new Date().toISOString();
-                localStorage.setItem('lastSyncTime', this.lastSyncTime);
-                document.getElementById('lastSyncTime').textContent =
-                    new Date(this.lastSyncTime).toLocaleString();
-            }
-
-            showNotification(message, type = 'info') {
-                // Create a simple notification
-                const notification = document.createElement('div');
-                notification.className = `sync-notification ${type}`;
-                notification.textContent = message;
-                notification.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    padding: 12px 20px;
-                    border-radius: 4px;
-                    z-index: 10000;
-                    animation: slideIn 0.3s ease;
-                    background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
-                    color: white;
-                `;
-
-                document.body.appendChild(notification);
-
-                setTimeout(() => {
-                    notification.style.animation = 'slideOut 0.3s ease';
-                    setTimeout(() => notification.remove(), 300);
-                }, 3000);
+        // Initialize sync functionality
+        function initializeSyncModal() {
+            // Update current user display
+            const currentUserDisplay = document.getElementById('currentUserDisplay');
+            if (currentUserDisplay) {
+                currentUserDisplay.textContent = localStorage.getItem('consensusUsername') || 'Unknown';
             }
         }
 
-        // Initialize cloud sync when page loads
-        let cloudSync;
+        // Show sync modal
+        function showSyncModal() {
+            initializeSyncModal();
+            document.getElementById('syncModal').style.display = 'block';
+        }
+
+        // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize after a short delay to ensure other components are ready
-            setTimeout(() => {
-                cloudSync = new CloudSyncManager();
-            }, 1000);
+            // Set up sync button
+            const syncBtn = document.getElementById('syncBtn');
+            if (syncBtn) {
+                syncBtn.addEventListener('click', showSyncModal);
+            }
         });
 
     </script>
