@@ -275,50 +275,19 @@
                     <!-- Returning User Section -->
                     <div class="user-section returning-user">
                         <h2>🔄 Returning Student?</h2>
-                        <p>Recover your existing username using one of these methods:</p>
+                        <p>Restore your data from a master database file:</p>
 
                         <div class="recovery-options">
-                            <!-- Manual Entry -->
+                            <!-- CSV Import - renamed to Restore -->
                             <div class="recovery-option">
-                                <div class="option-icon">✏️</div>
-                                <h3>Enter Username</h3>
-                                <input type="text"
-                                       id="manualUsername"
-                                       placeholder="e.g., Apple_Bear"
-                                       class="username-input"
-                                       onkeypress="if(event.key==='Enter') recoverUsername()">
-                                <button onclick="recoverUsername()" class="action-button primary">
-                                    Use This Username
-                                </button>
-                            </div>
-
-                            <!-- File Import -->
-                            <div class="recovery-option">
-                                <div class="option-icon">📁</div>
-                                <h3>Import from Backup</h3>
-                                <p class="option-description">Load your username from a previous export</p>
-                                <input type="file"
-                                       id="usernameImportFile"
-                                       accept=".json"
-                                       style="display: none;"
-                                       onchange="importUsernameFromFile(event)">
-                                <button onclick="document.getElementById('usernameImportFile').click()"
-                                        class="action-button secondary">
-                                    Choose File
-                                </button>
-                            </div>
-
-                            <!-- CSV Import -->
-                            <div class="recovery-option">
-                                <div class="option-icon">📊</div>
-                                <h3>Import with CSV Mapping</h3>
+                                <div class="option-icon">🔄</div>
+                                <h3>Restore</h3>
                                 <p class="option-description">Import master data using CSV student roster</p>
                                 <button onclick="showCSVImportModal()"
-                                        class="action-button secondary">
-                                    CSV Import
+                                        class="action-button primary">
+                                    Restore Data
                                 </button>
                             </div>
-
                         </div>
 
                         <!-- Recently Used Usernames (if any in localStorage) -->
@@ -817,7 +786,7 @@
             if (event.key === 'Escape') {
                 // Find any open modal and close it
                 const modals = [
-                    'unifiedSyncModal',
+                    'syncModal',
                     'csvImportModal',
                     'userManagementModal'
                 ];
@@ -827,8 +796,12 @@
                     if (modal && modal.style.display !== 'none') {
                         // Close the modal using the appropriate close function
                         switch (modalId) {
-                            case 'unifiedSyncModal':
-                                closeSyncModal();
+                            case 'syncModal':
+                                if (typeof closeSyncModal === 'function') {
+                                    closeSyncModal();
+                                } else {
+                                    modal.style.display = 'none';
+                                }
                                 break;
                             case 'csvImportModal':
                                 closeCSVImportModal();
@@ -1176,13 +1149,6 @@ function renderLessonSelector(unitInfo) {
                     ${lessonButtonsHtml}
                 </div>
             </div>
-        <div class="app-controls">
-            <button id="syncBtn" class="control-btn">
-                <i class="fas fa-sync"></i>
-                Sync
-            </button>
-            <input type="file" id="importFile" accept=".json" style="display: none;">
-        </div>
         <!-- Sync Modal -->
         <div id="syncModal" class="modal" style="display: none;">
             <div class="modal-content">
@@ -1247,13 +1213,6 @@ function renderLessonSelector(unitInfo) {
                 ${lessonButtonsHtml}
             </div>
         </div>
-        <div class="app-controls">
-            <button id="syncBtn" class="control-btn">
-                <i class="fas fa-sync"></i>
-                Sync
-            </button>
-            <input type="file" id="importFile" accept=".json" style="display: none;">
-        </div>
 
         <!-- Sync Modal -->
         <div id="syncModal" class="modal" style="display: none;">
@@ -1265,18 +1224,18 @@ function renderLessonSelector(unitInfo) {
                 <div class="sync-section">
                     <h3><i class="fas fa-user"></i> Student Actions</h3>
                     <div class="sync-buttons">
-                        <button id="exportBtn" class="modal-btn">
-                            <i class="fas fa-download"></i>
+                        <button id="saveBtn" class="modal-btn">
+                            <i class="fas fa-save"></i>
                             <span>
-                                <strong>Export My Data</strong>
-                                <small>Save your personal quiz data</small>
+                                <strong>Save</strong>
+                                <small>Export your personal data</small>
                             </span>
                         </button>
-                        <button id="importBtn" class="modal-btn">
-                            <i class="fas fa-upload"></i>
+                        <button id="openBtn" class="modal-btn">
+                            <i class="fas fa-folder-open"></i>
                             <span>
-                                <strong>Import Data</strong>
-                                <small>Load quiz data from file</small>
+                                <strong>Open</strong>
+                                <small>Import any database file</small>
                             </span>
                         </button>
                     </div>
@@ -1285,18 +1244,11 @@ function renderLessonSelector(unitInfo) {
                 <div class="sync-section">
                     <h3><i class="fas fa-chalkboard-teacher"></i> Teacher Actions</h3>
                     <div class="sync-buttons">
-                        <button id="totalExportBtn" class="modal-btn">
+                        <button id="masterExportBtn" class="modal-btn">
                             <i class="fas fa-database"></i>
                             <span>
                                 <strong>Master Export</strong>
                                 <small>Export all users' data</small>
-                            </span>
-                        </button>
-                        <button onclick="showCSVImportModal()" class="modal-btn">
-                            <i class="fas fa-file-csv"></i>
-                            <span>
-                                <strong>Master Import</strong>
-                                <small>Import with student roster</small>
                             </span>
                         </button>
                     </div>
@@ -1394,11 +1346,6 @@ function renderLessonSelector(unitInfo) {
                     <div style="flex: 1;">
                         <strong>Unit ${currentUnit}, Lesson ${currentLesson}</strong> - ${currentQuestions.length} questions
                     </div>
-                    <button id="syncBtn" class="control-btn">
-                        <i class="fas fa-sync"></i>
-                        Sync
-                    </button>
-                    <input type="file" id="importFile" accept=".json" style="display: none;">
                 </div>
 
                 <!-- Sync Modal -->
@@ -2985,7 +2932,6 @@ if (chartInstances[`dotplot-${questionId}`]) {
 
                 // Collision detection properties
                 this.headerCollisions = 0;
-                this.headerHeight = 120; // Define header region height
                 this.bounceThreshold = 3; // Number of bounces before triggering action
 
                 this.createElement();
@@ -3115,26 +3061,32 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     this.y += this.velocity.y;
                     this.velocity.y -= 0.8; // gravity
 
-                    // Check for header collision (top of screen)
-                    const spriteTopPosition = window.innerHeight - this.y - 32; // 32px is sprite height
-                    if (spriteTopPosition <= this.headerHeight && this.velocity.y > 0) {
-                        // Collision with header region
-                        this.headerCollisions++;
-                        this.velocity.y = -Math.abs(this.velocity.y); // Bounce down
+                    // Check for welcome element collision
+                    const welcomeElement = document.querySelector('.username-welcome');
+                    if (welcomeElement && this.velocity.y > 0) {
+                        const welcomeRect = welcomeElement.getBoundingClientRect();
+                        const spriteRect = this.element.getBoundingClientRect();
 
-                        // Visual feedback for collision
-                        this.element.style.filter = 'brightness(150%) ' + this.getColorFilter(this.color);
-                        setTimeout(() => {
-                            this.element.style.filter = this.getColorFilter(this.color);
-                        }, 200);
+                        // Check if sprite intersects with welcome element
+                        if (this.checkCollision(spriteRect, welcomeRect)) {
+                            // Collision with welcome element
+                            this.headerCollisions++;
+                            this.velocity.y = -Math.abs(this.velocity.y); // Bounce down
 
-                        // Check if we've reached the bounce threshold
-                        if (this.headerCollisions >= this.bounceThreshold) {
-                            this.triggerUsernameManagement();
-                            this.headerCollisions = 0; // Reset counter
+                            // Visual feedback for collision
+                            this.element.style.filter = 'brightness(150%) ' + this.getColorFilter(this.color);
+                            setTimeout(() => {
+                                this.element.style.filter = this.getColorFilter(this.color);
+                            }, 200);
+
+                            // Check if we've reached the bounce threshold
+                            if (this.headerCollisions >= this.bounceThreshold) {
+                                this.triggerUsernameManagement();
+                                this.headerCollisions = 0; // Reset counter
+                            }
+
+                            console.log(`Welcome element collision #${this.headerCollisions}`);
                         }
-
-                        console.log(`Header collision #${this.headerCollisions}`);
                     }
 
                     // Ground collision
@@ -3176,6 +3128,14 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 if (currentUsername) {
                     localStorage.setItem(`pigColor_${currentUsername}`, newColor);
                 }
+            }
+
+            checkCollision(spriteRect, welcomeRect) {
+                // Check if two rectangles overlap
+                return !(spriteRect.right < welcomeRect.left ||
+                        spriteRect.left > welcomeRect.right ||
+                        spriteRect.bottom < welcomeRect.top ||
+                        spriteRect.top > welcomeRect.bottom);
             }
 
             triggerUsernameManagement() {
@@ -3420,13 +3380,6 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     <div class="units-grid">
                         ${unitsHtml}
                     </div>
-                    <div class="app-controls" style="margin-top: 20px;">
-                        <button id="syncBtn" class="control-btn">
-                            <i class="fas fa-sync"></i>
-                            Sync
-                        </button>
-                        <input type="file" id="importFile" accept=".json" style="display: none;">
-                    </div>
 
                     <!-- Sync Modal -->
                     <div id="syncModal" class="modal" style="display: none;">
@@ -3561,13 +3514,6 @@ if (chartInstances[`dotplot-${questionId}`]) {
                             ${lessonButtonsHtml}
                         </div>
                     </div>
-                    <div class="export-section">
-                        <button id="syncBtn" class="control-btn">
-                            <i class="fas fa-sync"></i>
-                            Sync
-                        </button>
-                        <input type="file" id="importFile" accept=".json" style="display: none;">
-                    </div>
 
                     <!-- Sync Modal -->
                     <div id="syncModal" class="modal" style="display: none;">
@@ -3664,11 +3610,6 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     <div style="flex: 1;">
                         <strong>Unit ${currentUnit}, Lesson ${currentLesson}</strong> - ${currentQuestions.length} questions
                     </div>
-                    <button id="syncBtn" class="control-btn">
-                        <i class="fas fa-sync"></i>
-                        Sync
-                    </button>
-                    <input type="file" id="importFile" accept=".json" style="display: none;">
                 </div>
 
                 <!-- Sync Modal -->
@@ -3912,42 +3853,134 @@ if (chartInstances[`dotplot-${questionId}`]) {
 
         // Sync button functionality
         document.addEventListener('DOMContentLoaded', function() {
-            // Handle sync button clicks
-            document.addEventListener('click', function(event) {
-                if (event.target.id === 'syncBtn' || event.target.closest('#syncBtn')) {
-                    const modal = document.getElementById('syncModal');
-                    if (modal) {
-                        modal.style.display = 'block';
-                        // Always start with local sync tab
-                        document.querySelector('.sync-tab[data-tab="local"]')?.click();
-                    }
-                }
-            });
 
-            // Handle export button click
+            // Handle Save button click (personal export)
             document.addEventListener('click', function(event) {
-                if (event.target.id === 'exportBtn' || event.target.closest('#exportBtn')) {
+                if (event.target.id === 'saveBtn' || event.target.closest('#saveBtn')) {
                     exportPersonal();
                     closeSyncModal();
                 }
             });
 
-            // Handle import button click
+            // Handle Open button click (smart import)
             document.addEventListener('click', function(event) {
-                if (event.target.id === 'importBtn' || event.target.closest('#importBtn')) {
-                    document.getElementById('importFile').click();
+                if (event.target.id === 'openBtn' || event.target.closest('#openBtn')) {
+                    // Create hidden file input for smart import
+                    let smartImportInput = document.getElementById('smartImportFile');
+                    if (!smartImportInput) {
+                        smartImportInput = document.createElement('input');
+                        smartImportInput.type = 'file';
+                        smartImportInput.id = 'smartImportFile';
+                        smartImportInput.accept = '.json';
+                        smartImportInput.style.display = 'none';
+                        smartImportInput.addEventListener('change', handleSmartImport);
+                        document.body.appendChild(smartImportInput);
+                    }
+                    smartImportInput.click();
                     closeSyncModal();
                 }
             });
 
-            // Handle total export button click
+            // Handle Master Export button click
             document.addEventListener('click', function(event) {
-                if (event.target.id === 'totalExportBtn' || event.target.closest('#totalExportBtn')) {
+                if (event.target.id === 'masterExportBtn' || event.target.closest('#masterExportBtn')) {
                     exportMasterData();
                     closeSyncModal();
                 }
             });
         });
+
+        // Smart Import Function - Auto-detects file type
+        function handleSmartImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+
+                    // Detect file type and handle appropriately
+                    if (isPersonalDataFile(data)) {
+                        console.log('Detected: Personal data file');
+                        importPersonalData(data);
+                        showMessage('✅ Personal data imported successfully!', 'success');
+                    } else if (isMasterDataFile(data)) {
+                        console.log('Detected: Master database file');
+                        importMasterData(data);
+                        showMessage('✅ Master database imported successfully!', 'success');
+                    } else {
+                        showMessage('❌ Unrecognized file format. Please check your file.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Import error:', error);
+                    showMessage('❌ Error reading file. Please check the file format.', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // File type detection functions
+        function isPersonalDataFile(data) {
+            // Personal data files typically have a single user's answers and progress
+            return (data.answers && typeof data.answers === 'object') ||
+                   (data.username && data.exportType === 'personal') ||
+                   (data.progress && !data.students && !data.allUsers);
+        }
+
+        function isMasterDataFile(data) {
+            // Master data files have multiple users or class-wide data
+            return data.students ||
+                   data.allUsers ||
+                   data.exportType === 'master_database' ||
+                   (data.users && Object.keys(data.users).length > 1);
+        }
+
+        // Import functions for different file types
+        function importPersonalData(data) {
+            if (!currentUsername) {
+                showMessage('❌ Please select a username first.', 'error');
+                return;
+            }
+
+            // Import answers
+            if (data.answers) {
+                localStorage.setItem(`answers_${currentUsername}`, JSON.stringify(data.answers));
+            }
+
+            // Import progress
+            if (data.progress) {
+                localStorage.setItem(`progress_${currentUsername}`, JSON.stringify(data.progress));
+            }
+
+            // Reinitialize to show imported data
+            initClassData();
+            if (typeof renderUnitMenu === 'function') {
+                renderUnitMenu();
+            }
+        }
+
+        function importMasterData(data) {
+            // Use existing master data import functionality
+            if (typeof importClassData === 'function') {
+                importClassData(data);
+            } else if (typeof mergeMasterData === 'function') {
+                mergeMasterData(data);
+            } else {
+                console.warn('No master import function found, attempting basic import...');
+                // Basic fallback import
+                if (data.students) {
+                    Object.entries(data.students).forEach(([username, userData]) => {
+                        if (userData.answers) {
+                            localStorage.setItem(`answers_${username}`, JSON.stringify(userData.answers));
+                        }
+                        if (userData.progress) {
+                            localStorage.setItem(`progress_${username}`, JSON.stringify(userData.progress));
+                        }
+                    });
+                }
+            }
+        }
 
         // Update references from masterExportBtn to totalExportBtn
         window.exportMasterData = window.exportMasterData || function() {
