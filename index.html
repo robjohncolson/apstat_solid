@@ -3060,18 +3060,24 @@ if (chartInstances[`dotplot-${questionId}`]) {
                             if (spriteRect.right < platformRect.left || spriteRect.left > platformRect.right) {
                                 this.fallOffPlatform();
                             } else {
-                                // Stay on platform - maintain y position
-                                this.y = window.innerHeight - platformRect.top;
-                                this.velocity.y = 0;
+                                // Stay on platform - maintain y position ONLY if not jumping
+                                if (this.velocity.y <= 0) {
+                                    this.y = window.innerHeight - platformRect.top;
+                                    this.velocity.y = 0;
+                                } else {
+                                    // Jumping off platform - leave platform state
+                                    this.onPlatform = false;
+                                    this.platformElement = null;
+                                }
                             }
                         }
-                    } else {
-                        // Not on platform - check for new button collisions
-                        if (this.checkButtonCollisions()) {
-                            // Button collision handled, don't check ground
-                            this.element.style.bottom = this.y + 'px';
-                            return;
-                        }
+                    }
+
+                    // Always check for button collisions (whether on platform or not)
+                    if (this.checkButtonCollisions()) {
+                        // Button collision handled, don't check ground
+                        this.element.style.bottom = this.y + 'px';
+                        return;
                     }
 
                     // Ground collision (only if not on platform)
@@ -3164,7 +3170,7 @@ if (chartInstances[`dotplot-${questionId}`]) {
                         const buttonCenterY = buttonRect.top + buttonRect.height / 2;
 
                         // Platform collision (sprite falling onto or near button top)
-                        if (this.velocity.y >= 0 && spriteCenterY <= buttonCenterY) {
+                        if (this.velocity.y >= 0) {
                             // Calculate overlap percentage for horizontal overlap
                             const overlapLeft = Math.max(spriteRect.left, buttonRect.left);
                             const overlapRight = Math.min(spriteRect.right, buttonRect.right);
@@ -3173,7 +3179,9 @@ if (chartInstances[`dotplot-${questionId}`]) {
                             const overlapPercentage = (overlapWidth / spriteWidth) * 100;
 
                             // Check if pig is above or near button top and has sufficient overlap
-                            if (spriteRect.bottom <= buttonRect.top + 30 && overlapPercentage >= 50) {
+                            if (spriteRect.bottom >= buttonRect.top - 5 &&
+                                spriteRect.bottom <= buttonRect.top + 30 &&
+                                overlapPercentage >= 50) {
                                 this.landOnPlatform(buttonData, buttonRect);
                                 return true;
                             }
