@@ -575,52 +575,53 @@
                 localStorage.setItem('consensusUsername', username);
                 initClassData();
 
-                // Import data based on format
-                if (importData.exportTime && importData.students && importData.students[username]) {
-                    // Handle exportTime/students format (like master_peer_data file)
-                    const userData = importData.students[username];
-                    if (userData.answers) {
-                        localStorage.setItem(`answers_${username}`, JSON.stringify(userData.answers));
+                let userData = null;
+                let allStudentsData = {};
+                let importSuccess = false;
+
+                // Helper function to find username with case-insensitive matching
+                function findUserData(dataObj, targetUsername) {
+                    // Try exact match first
+                    if (dataObj[targetUsername]) {
+                        return { key: targetUsername, data: dataObj[targetUsername] };
                     }
-                    if (userData.progress) {
-                        localStorage.setItem(`progress_${username}`, JSON.stringify(userData.progress));
+                    // Try case-insensitive match
+                    const lowerTarget = targetUsername.toLowerCase();
+                    for (const key in dataObj) {
+                        if (key.toLowerCase() === lowerTarget) {
+                            console.log(`Found case-insensitive match: ${targetUsername} -> ${key}`);
+                            return { key: key, data: dataObj[key] };
+                        }
                     }
-
-                    // Import other students as peer data
-                    const allStudents = {};
-                    Object.keys(importData.students).forEach(otherUsername => {
-                        if (otherUsername !== username) {
-                            allStudents[otherUsername] = importData.students[otherUsername];
-                        }
-                    });
-
-                    // Store peer data in classData format
-                    const classData = JSON.parse(localStorage.getItem('classData') || '{}');
-                    if (!classData.users) classData.users = {};
-
-                    Object.keys(allStudents).forEach(otherUsername => {
-                        if (!classData.users[otherUsername]) {
-                            classData.users[otherUsername] = { answers: {}, reasons: {}, timestamps: {}, attempts: {} };
-                        }
-
-                        if (allStudents[otherUsername].answers) {
-                            Object.keys(allStudents[otherUsername].answers).forEach(questionId => {
-                                const answer = allStudents[otherUsername].answers[questionId];
-                                classData.users[otherUsername].answers[questionId] = answer.value || answer;
-                                if (answer.timestamp) {
-                                    classData.users[otherUsername].timestamps[questionId] = answer.timestamp;
-                                }
-                            });
-                        }
-                    });
-
-                    localStorage.setItem('classData', JSON.stringify(classData));
-                    showMessage(`Data imported successfully for ${username}! Found ${Object.keys(allStudents).length} peer students.`, 'success');
+                    return null;
                 }
+
+                // DETECTION 1: Master file with "students" field (current format)
+                if (importData.exportTime && importData.students) {
+                    const userMatch = findUserData(importData.students, username);
+                    if (userMatch) {
+                        console.log('Detected: Master file with students field');
+                        userData = userMatch.data;
+                        allStudentsData = importData.students;
+                        importSuccess = true;
+                    }
+                }
+                // DETECTION 2: Legacy individual file with "users" field
+                else if (importData.exportTime && importData.users) {
+                    const userMatch = findUserData(importData.users, username);
+                    if (userMatch) {
+                        console.log('Detected: Legacy individual file with users field');
+                        userData = userMatch.data;
+                        allStudentsData = importData.users;
+                        importSuccess = true;
+                    }
+                }
+                // DETECTION 3: Master database export format
                 else if (importData.exportType === 'master_database') {
-                    // Handle master database format
+                    console.log('Detected: Master database format');
                     if (importData.allAnswers && importData.allAnswers[username]) {
                         localStorage.setItem(`answers_${username}`, JSON.stringify(importData.allAnswers[username]));
+                        importSuccess = true;
                     }
                     if (importData.allProgress && importData.allProgress[username]) {
                         localStorage.setItem(`progress_${username}`, JSON.stringify(importData.allProgress[username]));
@@ -630,9 +631,83 @@
                     }
                     showMessage(`Master database imported successfully for ${username}!`, 'success');
                 }
-                else {
-                    // Handle simple personal export
+                // DETECTION 4: Simple username-only format (fallback)
+                else if (importData.username || importData.consensusUsername) {
+                    console.log('Detected: Username-only format');
                     showMessage(`Username set to ${username} from import file.`, 'success');
+                    importSuccess = true;
+                }
+
+                // Process user data if found (for formats 1 & 2)
+                if (userData) {
+                    console.log(`Processing user data for ${username}:`, userData);
+
+                    // Import user's personal data to both individual keys AND classData structure
+                    if (userData.answers) {
+                        localStorage.setItem(`answers_${username}`, JSON.stringify(userData.answers));
+                        console.log(`Imported ${Object.keys(userData.answers).length} answers for ${username}`);
+                    }
+                    if (userData.reasons) {
+                        localStorage.setItem(`reasons_${username}`, JSON.stringify(userData.reasons));
+                        console.log(`Imported ${Object.keys(userData.reasons).length} reasons for ${username}`);
+                    }
+                    if (userData.progress) {
+                        localStorage.setItem(`progress_${username}`, JSON.stringify(userData.progress));
+                    }
+                    if (userData.timestamps) {
+                        localStorage.setItem(`timestamps_${username}`, JSON.stringify(userData.timestamps));
+                    }
+                    if (userData.attempts) {
+                        localStorage.setItem(`attempts_${username}`, JSON.stringify(userData.attempts));
+                    }
+
+                    // CRITICAL: Update classData for both current user AND peer data
+                    const classData = JSON.parse(localStorage.getItem('classData') || '{}');
+                    if (!classData.users) classData.users = {};
+
+                    // First, ensure current user exists in classData and populate their data
+                    if (!classData.users[username]) {
+                        classData.users[username] = { answers: {}, reasons: {}, timestamps: {}, attempts: {} };
+                    }
+                    if (userData.answers) Object.assign(classData.users[username].answers, userData.answers);
+                    if (userData.reasons) Object.assign(classData.users[username].reasons, userData.reasons);
+                    if (userData.timestamps) Object.assign(classData.users[username].timestamps, userData.timestamps);
+                    if (userData.attempts) Object.assign(classData.users[username].attempts, userData.attempts);
+                    console.log(`Updated classData for current user ${username} with ${Object.keys(userData.answers || {}).length} answers`);
+
+                    let peerCount = 0;
+                    Object.keys(allStudentsData).forEach(otherUsername => {
+                        if (otherUsername !== username) {
+                            peerCount++;
+                            if (!classData.users[otherUsername]) {
+                                classData.users[otherUsername] = { answers: {}, reasons: {}, timestamps: {}, attempts: {} };
+                            }
+
+                            const otherUserData = allStudentsData[otherUsername];
+                            if (otherUserData.answers) {
+                                Object.keys(otherUserData.answers).forEach(questionId => {
+                                    const answer = otherUserData.answers[questionId];
+                                    classData.users[otherUsername].answers[questionId] = answer.value || answer;
+                                    if (answer.timestamp) {
+                                        classData.users[otherUsername].timestamps[questionId] = answer.timestamp;
+                                    }
+                                });
+                            }
+                            if (otherUserData.reasons) {
+                                Object.assign(classData.users[otherUsername].reasons, otherUserData.reasons);
+                            }
+                            if (otherUserData.attempts) {
+                                Object.assign(classData.users[otherUsername].attempts, otherUserData.attempts);
+                            }
+                        }
+                    });
+
+                    localStorage.setItem('classData', JSON.stringify(classData));
+                    showMessage(`Data imported successfully for ${username}! Found ${peerCount} peer students.`, 'success');
+                }
+
+                if (!importSuccess) {
+                    throw new Error('Unrecognized file format - check your file structure');
                 }
 
                 // Initialize and show welcome, then navigate to units
