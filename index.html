@@ -1451,6 +1451,11 @@ function renderLessonSelector(unitInfo) {
                         <div class="question-prompt">${question.prompt || 'No prompt provided'}</div>
             `;
 
+            // Render question attachments (charts, tables, images) in main column
+            if (question.attachments) {
+                html += renderAttachments(question.attachments, question.id);
+            }
+
             // Handle MCQ in main column
             if (question.type === 'multiple-choice') {
                 const choices = question.choices || question.attachments?.choices || [];
@@ -1527,26 +1532,13 @@ function renderLessonSelector(unitInfo) {
                         </div>
                     </div>
 
-                    <!-- RIGHT COLUMN: Peer Data Sidebar -->
+                    <!-- RIGHT COLUMN: Peer Reasoning Sidebar -->
                     <div class="peer-sidebar">
                         <div class="peer-sidebar-content">
-                            <!-- Chart/Table attachments moved here -->
-                            <div class="sidebar-attachments" id="sidebar-attachments-${question.id}">
-                                ${question.attachments ? renderAttachmentsForSidebar(question.attachments, question.id) : ''}
-                            </div>
-
-                            <!-- Consensus visualizations -->
-                            <div class="sidebar-consensus">
-                                <div class="dotplot-section ${isAnswered ? 'show' : ''}" id="dotplot-section-${question.id}">
-                                    <canvas id="dotplot-${question.id}" width="350" height="180"></canvas>
-                                    <div id="consensus-${question.id}"></div>
-                                </div>
-                            </div>
-
-                            <!-- Peer reasoning section (always visible) -->
+                            <!-- Peer reasoning section (main focus) -->
                             <div class="peer-reasoning-section" id="peer-reasoning-${question.id}">
                                 <div class="peer-reasoning-header">
-                                    <h4>🤝 Class Reasoning</h4>
+                                    <h4>🤝 Peer Responses</h4>
                                     <span class="peer-count" id="peer-count-${question.id}">Loading...</span>
                                 </div>
                                 <div class="peer-reasoning-content" id="peer-reasoning-content-${question.id}">
@@ -1558,7 +1550,108 @@ function renderLessonSelector(unitInfo) {
                 </div>
             `;
 
+            // If this question is already answered, populate peer responses immediately
+            setTimeout(() => {
+                if (isAnswered) {
+                    populatePeerResponses(question.id, question.type);
+                }
+            }, 100);
+
             return html;
+        }
+
+        // Populate peer reasoning section with peer response cards
+        function populatePeerReasoning(questionId, contributors) {
+            const peerReasoningContent = document.getElementById(`peer-reasoning-content-${questionId}`);
+            const peerCountSpan = document.getElementById(`peer-count-${questionId}`);
+
+            if (!peerReasoningContent) return;
+
+            // Filter out current user's responses for peer display
+            const peerResponses = contributors.filter(c => c.username !== currentUsername);
+
+            // Update peer count
+            if (peerCountSpan) {
+                peerCountSpan.textContent = peerResponses.length > 0 ? `${peerResponses.length} peers` : 'No peers yet';
+            }
+
+            if (peerResponses.length === 0) {
+                peerReasoningContent.innerHTML = '<div class="peer-hint">No peer responses yet. Be the first to answer!</div>';
+                return;
+            }
+
+            // Sort responses - those with reasoning first
+            peerResponses.sort((a, b) => {
+                const aHasReason = a.reason && a.reason.trim().length > 0;
+                const bHasReason = b.reason && b.reason.trim().length > 0;
+                if (aHasReason && !bHasReason) return -1;
+                if (!aHasReason && bHasReason) return 1;
+                return 0;
+            });
+
+            let html = '';
+            peerResponses.forEach(peer => {
+                const hasReason = peer.reason && peer.reason.trim().length > 0;
+                const isCorrect = peer.isCorrect || false; // Will implement majority logic later
+
+                html += `
+                    <div class="peer-response-card ${isCorrect ? 'correct' : 'incorrect'}">
+                        <div class="peer-name">${peer.username} ${isCorrect ? '✓' : ''}</div>
+                        <div class="peer-answer"><strong>Answer:</strong> ${peer.choice || peer.response}</div>
+                        ${hasReason ? `
+                            <div class="peer-reasoning-text">${peer.reason}</div>
+                        ` : '<div class="peer-reasoning-text" style="color: #999; font-style: italic;">No explanation provided</div>'}
+
+                        ${peer.response ? `
+                            <div class="peer-voting-buttons" style="margin-top: 10px;">
+                                <button onclick="voteFRQ('${questionId}', '${peer.username}', 'helpful')" class="vote-btn helpful">
+                                    💡 Helpful (${getVoteCount(questionId, peer.username, 'helpful')})
+                                </button>
+                                <button onclick="voteFRQ('${questionId}', '${peer.username}', 'unclear')" class="vote-btn unclear">
+                                    🤔 Unclear (${getVoteCount(questionId, peer.username, 'unclear')})
+                                </button>
+                                <button onclick="voteFRQ('${questionId}', '${peer.username}', 'contradicts')" class="vote-btn contradicts">
+                                    ⚔️ Contradicts (${getVoteCount(questionId, peer.username, 'contradicts')})
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            peerReasoningContent.innerHTML = html;
+        }
+
+        // Gather peer responses and populate reasoning section
+        function populatePeerResponses(questionId, questionType) {
+            const contributors = [];
+
+            // Gather all user responses for this question
+            for (let username in classData.users) {
+                const userAnswer = classData.users[username].answers?.[questionId];
+                if (userAnswer) {
+                    const response = userAnswer.value || userAnswer;
+                    const reason = classData.users[username].reasons?.[questionId] || '';
+
+                    if (questionType === 'multiple-choice') {
+                        contributors.push({
+                            username: username,
+                            choice: response,
+                            reason: reason
+                        });
+                    } else {
+                        // FRQ
+                        contributors.push({
+                            username: username,
+                            response: response,
+                            reason: reason
+                        });
+                    }
+                }
+            }
+
+            // Call the populate function with the gathered data
+            populatePeerReasoning(questionId, contributors);
         }
 
         // Render attachments (charts, tables, images)
@@ -2213,11 +2306,11 @@ function renderAttachments(attachments, questionId) {
                 header.innerHTML += '<span style="color: #a5d6a7;">✓ Answered</span>';
             }
 
-            // Show/update dotplot immediately after submission
+            // Show/update dotplot immediately after submission (if it exists)
             const dotplotSection = document.getElementById(`dotplot-section-${questionId}`);
 
-            // Ensure the section is visible
-            if (!dotplotSection.classList.contains('show')) {
+            // Ensure the section is visible (only if dotplot section exists)
+            if (dotplotSection && !dotplotSection.classList.contains('show')) {
                 dotplotSection.classList.add('show');
                 dotplotSection.style.opacity = '0';
                 setTimeout(() => {
@@ -2251,7 +2344,17 @@ function renderAttachments(attachments, questionId) {
                 } else {
                     renderFRQResponses(questionId);
                 }
+
+                // Populate peer reasoning after chart rendering
+                populatePeerResponses(questionId, questionType);
             }, 50);
+
+            // Trigger answer key display logic
+            const correctAnswer = getCorrectAnswer(questionId);
+            const isCorrect = (value.toLowerCase() === correctAnswer.toLowerCase());
+            const hasExplanation = (reason && reason.length > 0);
+
+            displayAnswerKey(questionId, isCorrect, hasExplanation, attempts + 1);
         }
 
         // Show dotplot

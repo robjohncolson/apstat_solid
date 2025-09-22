@@ -1,7 +1,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    max-width: 900px;
+    max-width: 95%;
     margin: 0 auto;
     padding: 20px;
     background-color: #f5f5f5;
@@ -2126,9 +2126,10 @@ body.dark-mode .import-step select {
 .quiz-container.two-column-layout {
     display: flex;
     gap: 30px;
-    max-width: 1400px;
+    max-width: 95%; /* Use 80% of viewport width */
     margin: 0 auto;
     align-items: flex-start;
+    min-height: auto; /* Allow natural height expansion */
 }
 
 /* Main question column (left side - 65% width) */
@@ -2144,24 +2145,31 @@ body.dark-mode .import-step select {
 
 /* Peer sidebar (right side - 35% width) */
 .peer-sidebar {
-    flex: 0 0 400px; /* Fixed width for consistency */
+    flex: 0 0 450px; /* Slightly wider for better content display */
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     border: 2px solid #95a5a6;
     position: sticky;
     top: 20px;
-    max-height: calc(100vh - 40px);
-    overflow: hidden;
+    /* Remove height constraints - let content drive height */
+    height: auto;
+    min-height: 300px;
+    max-height: calc(100vh - 40px); /* Only for scroll threshold */
+    overflow: visible; /* Let content expand naturally */
 }
 
 .peer-sidebar-content {
     padding: 20px;
-    height: 100%;
+    /* Let content determine its own height */
+    height: auto;
+    min-height: fit-content;
     display: flex;
     flex-direction: column;
     gap: 20px;
+    /* Only scroll when content exceeds viewport */
     overflow-y: auto;
+    max-height: calc(100vh - 100px);
 }
 
 /* Sidebar sections */
@@ -2265,6 +2273,59 @@ body.dark-mode .import-step select {
     background: white;
     padding: 8px;
     border-radius: 4px;
+}
+
+/* Voting buttons for peer responses */
+.peer-voting-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.vote-btn {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.vote-btn:hover {
+    background: #e9ecef;
+    transform: translateY(-1px);
+}
+
+.vote-btn.helpful {
+    background: #d4edda;
+    border-color: #27ae60;
+    color: #155724;
+}
+
+.vote-btn.helpful:hover {
+    background: #c3e6cb;
+}
+
+.vote-btn.unclear {
+    background: #fff3cd;
+    border-color: #ffc107;
+    color: #856404;
+}
+
+.vote-btn.unclear:hover {
+    background: #ffeaa7;
+}
+
+.vote-btn.contradicts {
+    background: #f8d7da;
+    border-color: #e74c3c;
+    color: #721c24;
+}
+
+.vote-btn.contradicts:hover {
+    background: #f5c6cb;
 }
 
 /* Loading and hint states */
