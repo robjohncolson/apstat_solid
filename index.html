@@ -1526,6 +1526,18 @@ function renderLessonSelector(unitInfo) {
                                 >
                                     ${isAnswered ? (canRetryQuestion ? 'Update Answer' : 'Max Attempts Reached') : 'Submit Answer'}
                                 </button>
+
+                                ${isAnswered && !canRetryQuestion && attempts < 3 && !(classData.users[currentUsername]?.reasons?.[question.id]?.trim()) ? `
+                                    <button
+                                        id="add-explanation-${question.id}"
+                                        class="add-explanation-button"
+                                        onclick="addExplanationToRetry('${question.id}')"
+                                        style="margin-left: 10px; background: #28a745; color: white;"
+                                    >
+                                        Add Explanation to Retry
+                                    </button>
+                                ` : ''}
+
                                 <span id="error-${question.id}" class="error-msg"></span>
                                 <span id="success-${question.id}" class="success-msg"></span>
                             </div>
@@ -2724,6 +2736,101 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 reason: r.reason
             }));
             populatePeerReasoning(questionId, frqContributors);
+        }
+
+        // Add explanation retroactively to enable retry
+        window.addExplanationToRetry = function(questionId) {
+            const reasonTextarea = document.getElementById(`reason-${questionId}`);
+            const addExplanationBtn = document.getElementById(`add-explanation-${questionId}`);
+            const submitBtn = document.getElementById(`submit-${questionId}`);
+            const errorSpan = document.getElementById(`error-${questionId}`);
+            const successSpan = document.getElementById(`success-${questionId}`);
+
+            // Clear previous messages
+            if (errorSpan) {
+                errorSpan.textContent = '';
+                errorSpan.classList.remove('show');
+            }
+            if (successSpan) {
+                successSpan.textContent = '';
+                successSpan.classList.remove('show');
+            }
+
+            // Check if explanation is provided
+            const explanation = reasonTextarea ? reasonTextarea.value.trim() : '';
+            if (!explanation) {
+                if (errorSpan) {
+                    errorSpan.textContent = 'Please provide an explanation first.';
+                    errorSpan.classList.add('show');
+                }
+                // Focus on the textarea
+                if (reasonTextarea) {
+                    reasonTextarea.focus();
+                    reasonTextarea.classList.add('required');
+                }
+                return;
+            }
+
+            // Save the explanation
+            if (!classData.users[currentUsername]) {
+                classData.users[currentUsername] = {
+                    answers: {},
+                    reasons: {},
+                    timestamps: {},
+                    attempts: {}
+                };
+            }
+
+            classData.users[currentUsername].reasons[questionId] = explanation;
+            saveClassData();
+
+            // Update UI to enable retry
+            if (addExplanationBtn) {
+                addExplanationBtn.style.display = 'none';
+            }
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update Answer';
+            }
+
+            // Re-enable form inputs for answer changes
+            // Enable radio buttons for multiple choice
+            const radioButtons = document.querySelectorAll(`input[name="choice-${questionId}"]`);
+            radioButtons.forEach(radio => {
+                radio.disabled = false;
+            });
+
+            // Enable FRQ textarea
+            const frqTextarea = document.getElementById(`frq-${questionId}`);
+            if (frqTextarea) {
+                frqTextarea.disabled = false;
+            }
+
+            // Remove disabled styling from choice divs
+            const choiceDivs = document.querySelectorAll(`[data-question-id="${questionId}"] .choice.disabled`);
+            choiceDivs.forEach(choiceDiv => {
+                choiceDiv.classList.remove('disabled');
+            });
+
+            // Show success message
+            if (successSpan) {
+                successSpan.textContent = 'Explanation added! You can now change your answer and retry.';
+                successSpan.classList.add('show');
+                setTimeout(() => {
+                    successSpan.classList.remove('show');
+                }, 4000);
+            }
+
+            // Remove required styling from textarea
+            if (reasonTextarea) {
+                reasonTextarea.classList.remove('required');
+            }
+
+            // Update placeholder text
+            if (reasonTextarea) {
+                reasonTextarea.placeholder = 'Explanation saved. You can now update your answer.';
+            }
         }
 
         // Helper function to get vote count

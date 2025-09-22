@@ -2328,6 +2328,36 @@ body.dark-mode .import-step select {
     background: #f5c6cb;
 }
 
+/* Add explanation to retry button */
+.add-explanation-button {
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 10px;
+}
+
+.add-explanation-button:hover {
+    background: #218838;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.add-explanation-button:active {
+    transform: translateY(0);
+}
+
+/* Required textarea styling */
+.reason-textarea.required {
+    border: 2px solid #e74c3c;
+    box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.25);
+}
+
 /* Loading and hint states */
 .peer-loading, .peer-hint {
     text-align: center;
