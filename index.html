@@ -1438,36 +1438,33 @@ function renderLessonSelector(unitInfo) {
             const isAnswered = isQuestionAnswered(question.id);
             const attempts = getAttemptCount(question.id);
             const canRetryQuestion = canRetry(question.id);
-            
+
+            // Create two-column layout structure
             let html = `
-                <div class="quiz-container" data-question-id="${question.id}" data-question-number="${questionNumber}">
-                    <div class="question-header">
-                        <span>Question ${questionNumber}</span>
-                        ${isAnswered ? '<span style="color: #a5d6a7;">✓ Answered</span>' : ''}
-                    </div>
-                    <div class="question-id">ID: ${question.id || 'N/A'}</div>
-                    <div class="question-prompt">${question.prompt || 'No prompt provided'}</div>
+                <div class="quiz-container two-column-layout" data-question-id="${question.id}" data-question-number="${questionNumber}">
+                    <div class="question-main-column">
+                        <div class="question-header">
+                            <span>Question ${questionNumber}</span>
+                            ${isAnswered ? '<span style="color: #a5d6a7;">✓ Answered</span>' : ''}
+                        </div>
+                        <div class="question-id">ID: ${question.id || 'N/A'}</div>
+                        <div class="question-prompt">${question.prompt || 'No prompt provided'}</div>
             `;
 
-            // Render attachments if present
-            if (question.attachments) {
-                html += renderAttachments(question.attachments, question.id);
-            }
-
-            // Handle MCQ
+            // Handle MCQ in main column
             if (question.type === 'multiple-choice') {
                 const choices = question.choices || question.attachments?.choices || [];
                 const savedAnswer = classData.users[currentUsername]?.answers?.[question.id];
                 const isDisabled = isAnswered && !canRetryQuestion;
-                
+
                 html += '<div class="choices">';
                 choices.forEach(choice => {
                     const isSelected = savedAnswer?.value === choice.key || savedAnswer === choice.key;
                     html += `
                         <div class="choice ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}">
                             <label>
-                                <input type="radio" 
-                                       name="choice-${question.id}" 
+                                <input type="radio"
+                                       name="choice-${question.id}"
                                        value="${choice.key}"
                                        ${isSelected ? 'checked' : ''}
                                        ${isDisabled ? 'disabled' : ''}>
@@ -1480,7 +1477,7 @@ function renderLessonSelector(unitInfo) {
                 html += '</div>';
             }
 
-            // Handle FRQ
+            // Handle FRQ in main column
             if (question.type === 'free-response') {
                 const savedAnswer = classData.users[currentUsername]?.answers?.[question.id];
                 const isDisabled = isAnswered && !canRetryQuestion;
@@ -1497,70 +1494,87 @@ function renderLessonSelector(unitInfo) {
                 `;
             }
 
-            // Add answer section
+            // Add reasoning section in main column
             html += `
-                <div class="answer-section">
-                    <div class="reason-wrapper">
-                        <label class="reason-label">
-                            ${attempts > 0 && !canRetryQuestion ? 
-                                'Your explanation (required for retry):' : 
-                                'Explain your reasoning (optional but enables retry):'}
-                        </label>
-                        <textarea 
-                            id="reason-${question.id}"
-                            class="reason-textarea ${attempts > 0 && canRetryQuestion ? 'required' : ''}"
-                            placeholder="${attempts > 0 && !canRetryQuestion ? 
-                                'Previous attempt did not include reasoning. Add reasoning to enable retry.' : 
-                                'Explain why you chose this answer...'}"
-                            ${!canRetryQuestion && attempts >= 3 ? 'disabled' : ''}
-                        >${classData.users[currentUsername]?.reasons?.[question.id] || ''}</textarea>
+                        <div class="answer-section">
+                            <div class="reason-wrapper">
+                                <label class="reason-label">
+                                    ${attempts > 0 && !canRetryQuestion ?
+                                        'Your explanation (required for retry):' :
+                                        'Explain your reasoning (optional but enables retry):'}
+                                </label>
+                                <textarea
+                                    id="reason-${question.id}"
+                                    class="reason-textarea ${attempts > 0 && canRetryQuestion ? 'required' : ''}"
+                                    placeholder="${attempts > 0 && !canRetryQuestion ?
+                                        'Previous attempt did not include reasoning. Add reasoning to enable retry.' :
+                                        'Explain why you chose this answer...'}"
+                                    ${!canRetryQuestion && attempts >= 3 ? 'disabled' : ''}
+                                >${classData.users[currentUsername]?.reasons?.[question.id] || ''}</textarea>
+                            </div>
+                            <div>
+                                <button
+                                    id="submit-${question.id}"
+                                    class="submit-button"
+                                    onclick="submitAnswer('${question.id}', '${question.type}')"
+                                    ${!canRetryQuestion && isAnswered ? 'disabled' : ''}
+                                >
+                                    ${isAnswered ? (canRetryQuestion ? 'Update Answer' : 'Max Attempts Reached') : 'Submit Answer'}
+                                </button>
+                                <span id="error-${question.id}" class="error-msg"></span>
+                                <span id="success-${question.id}" class="success-msg"></span>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <button 
-                            id="submit-${question.id}"
-                            class="submit-button" 
-                            onclick="submitAnswer('${question.id}', '${question.type}')"
-                            ${!canRetryQuestion && isAnswered ? 'disabled' : ''}
-                        >
-                            ${isAnswered ? (canRetryQuestion ? 'Update Answer' : 'Max Attempts Reached') : 'Submit Answer'}
-                        </button>
-                        <span id="error-${question.id}" class="error-msg"></span>
-                        <span id="success-${question.id}" class="success-msg"></span>
+
+                    <!-- RIGHT COLUMN: Peer Data Sidebar -->
+                    <div class="peer-sidebar">
+                        <div class="peer-sidebar-content">
+                            <!-- Chart/Table attachments moved here -->
+                            <div class="sidebar-attachments" id="sidebar-attachments-${question.id}">
+                                ${question.attachments ? renderAttachmentsForSidebar(question.attachments, question.id) : ''}
+                            </div>
+
+                            <!-- Consensus visualizations -->
+                            <div class="sidebar-consensus">
+                                <div class="dotplot-section ${isAnswered ? 'show' : ''}" id="dotplot-section-${question.id}">
+                                    <canvas id="dotplot-${question.id}" width="350" height="180"></canvas>
+                                    <div id="consensus-${question.id}"></div>
+                                </div>
+                            </div>
+
+                            <!-- Peer reasoning section (always visible) -->
+                            <div class="peer-reasoning-section" id="peer-reasoning-${question.id}">
+                                <div class="peer-reasoning-header">
+                                    <h4>🤝 Class Reasoning</h4>
+                                    <span class="peer-count" id="peer-count-${question.id}">Loading...</span>
+                                </div>
+                                <div class="peer-reasoning-content" id="peer-reasoning-content-${question.id}">
+                                    ${isAnswered ? '<div class="peer-loading">Loading peer responses...</div>' : '<div class="peer-hint">Answer the question to see peer responses</div>'}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
 
-            // Add dotplot section (always visible if answered)
-            if (isAnswered) {
-                html += `
-                    <div class="dotplot-section show" id="dotplot-section-${question.id}">
-                        <canvas id="dotplot-${question.id}" width="400" height="200"></canvas>
-                        <div id="consensus-${question.id}"></div>
-                        <div class="contributors-list" id="contributors-${question.id}"></div>
-                    </div>
-                `;
-            } else {
-                html += `<div class="dotplot-section" id="dotplot-section-${question.id}"></div>`;
-            }
-
-            html += '</div>';
             return html;
         }
 
         // Render attachments (charts, tables, images)
         function renderAttachments(attachments, questionId) {
             let html = '';
-            
+
             // Handle charts
             if (attachments.chartType) {
                 html += renderChart(attachments, questionId);
             }
-            
+
             // Handle tables
             if (attachments.table) {
                 html += renderTable(attachments.table);
             }
-            
+
             // Handle images
             if (attachments.image) {
                 html += `
@@ -1569,7 +1583,44 @@ function renderLessonSelector(unitInfo) {
                     </div>
                 `;
             }
-            
+
+            return html;
+        }
+
+        // Render attachments for sidebar (with modified sizing)
+        function renderAttachmentsForSidebar(attachments, questionId) {
+            let html = '';
+
+            // Handle charts in sidebar
+            if (attachments.chartType) {
+                html += `
+                    <div class="sidebar-chart-container">
+                        <h5>📊 Data Visualization</h5>
+                        ${renderChart(attachments, questionId + '-sidebar')}
+                    </div>
+                `;
+            }
+
+            // Handle tables in sidebar
+            if (attachments.table) {
+                html += `
+                    <div class="sidebar-table-container">
+                        <h5>📋 Data Table</h5>
+                        ${renderTable(attachments.table)}
+                    </div>
+                `;
+            }
+
+            // Handle images in sidebar
+            if (attachments.image) {
+                html += `
+                    <div class="sidebar-image-container">
+                        <h5>🖼️ Reference Image</h5>
+                        <img src="${attachments.image}" alt="Question image" style="max-width: 100%; height: auto; border-radius: 8px;">
+                    </div>
+                `;
+            }
+
             return html;
         }
         
@@ -2430,6 +2481,67 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 });
                 contributorsDiv.innerHTML = html;
             }
+
+            // ALSO populate the sidebar peer reasoning section
+            populatePeerReasoning(questionId, contributors);
+        }
+
+        // Function to populate the sidebar peer reasoning section
+        function populatePeerReasoning(questionId, contributors) {
+            const peerReasoningContent = document.getElementById(`peer-reasoning-content-${questionId}`);
+            const peerCount = document.getElementById(`peer-count-${questionId}`);
+
+            if (!peerReasoningContent) return;
+
+            // Update peer count
+            if (peerCount) {
+                const totalPeers = contributors.filter(c => c.username !== currentUsername).length;
+                peerCount.textContent = `${totalPeers} peers`;
+            }
+
+            if (contributors.length === 0) {
+                peerReasoningContent.innerHTML = '<div class="peer-hint">No peer responses available yet</div>';
+                return;
+            }
+
+            // Filter out current user and sort by reasoning quality
+            const peerResponses = contributors
+                .filter(c => c.username !== currentUsername)
+                .sort((a, b) => {
+                    // Sort: those with reasons first, then alphabetically
+                    if (a.reason && !b.reason) return -1;
+                    if (!a.reason && b.reason) return 1;
+                    return a.username.localeCompare(b.username);
+                });
+
+            if (peerResponses.length === 0) {
+                peerReasoningContent.innerHTML = '<div class="peer-hint">You\'re the first to answer this question!</div>';
+                return;
+            }
+
+            // Generate peer response cards
+            let html = '';
+            peerResponses.forEach(peer => {
+                const badges = calculateBadges(peer.username);
+                const badgeText = badges.length > 0 ? ` ${badges.join(' ')}` : '';
+                const hasReason = peer.reason && peer.reason.trim().length > 0;
+
+                // Determine if answer is correct (basic heuristic - could be enhanced)
+                const isCorrect = badgeText.includes('🏆') || badgeText.includes('⭐');
+
+                html += `
+                    <div class="peer-response-card ${isCorrect ? 'correct' : 'incorrect'}">
+                        <div class="peer-name">${peer.username}${badgeText}</div>
+                        <div class="peer-answer"><strong>Answer:</strong> ${peer.choice || peer.response} ${isCorrect ? '✓' : ''}</div>
+                        ${hasReason ?
+                            `<div class="peer-reasoning-text">"${peer.reason}"</div>` :
+                            '<div class="peer-reasoning-text" style="color: #999;">No explanation provided</div>'
+                        }
+                    </div>
+                `;
+            });
+
+            peerReasoningContent.innerHTML = html;
         }
 
         // Render FRQ responses
@@ -2500,6 +2612,15 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 });
                 contributorsDiv.innerHTML = html;
             }
+
+            // ALSO populate the sidebar peer reasoning section for FRQ
+            const frqContributors = responses.map(r => ({
+                username: r.username,
+                choice: 'FRQ Response',
+                response: r.response,
+                reason: r.reason
+            }));
+            populatePeerReasoning(questionId, frqContributors);
         }
 
         // Helper function to get vote count
