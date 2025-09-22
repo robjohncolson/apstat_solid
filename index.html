@@ -883,6 +883,76 @@
             }
         });
 
+        // Global Ctrl+S Shortcut Handler
+        document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === 's') {
+                // Check if user is typing in an input field
+                const activeElement = document.activeElement;
+                const isTyping = activeElement && (
+                    activeElement.tagName === 'TEXTAREA' ||
+                    activeElement.tagName === 'INPUT' ||
+                    activeElement.contentEditable === 'true' ||
+                    activeElement.classList.contains('frq-textarea') ||
+                    activeElement.classList.contains('reason-textarea')
+                );
+
+                // Don't trigger if user is typing
+                if (isTyping) {
+                    return;
+                }
+
+                // Prevent browser's default save behavior
+                event.preventDefault();
+
+                // Flash green effect
+                flashGreenScreen();
+
+                // Open sync modal after flash
+                setTimeout(() => {
+                    showSyncModal();
+                }, 150);
+            }
+        });
+
+        // Green flash effect function
+        function flashGreenScreen() {
+            const flash = document.createElement('div');
+            flash.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background-color: rgba(76, 175, 80, 0.3);
+                z-index: 999999;
+                pointer-events: none;
+                animation: flashFade 0.3s ease-out;
+            `;
+
+            // Add CSS animation if not exists
+            if (!document.querySelector('#flashAnimation')) {
+                const style = document.createElement('style');
+                style.id = 'flashAnimation';
+                style.textContent = `
+                    @keyframes flashFade {
+                        0% { opacity: 0; }
+                        50% { opacity: 1; }
+                        100% { opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            document.body.appendChild(flash);
+
+            // Remove flash after animation
+            setTimeout(() => {
+                if (flash.parentNode) {
+                    flash.parentNode.removeChild(flash);
+                }
+            }, 300);
+        }
+
         // Unified Sync Modal System
 
         window.closeSyncModal = function() {
@@ -3077,17 +3147,36 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 for (const buttonData of this.buttons) {
                     const buttonRect = buttonData.rect;
 
-                    if (this.checkCollision(spriteRect, buttonRect)) {
-                        // Determine collision type based on sprite movement direction
+                    // Create expanded collision area above button for easier landing
+                    const expandedRect = {
+                        left: buttonRect.left,
+                        right: buttonRect.right,
+                        top: buttonRect.top - 25, // Expand 25px above button
+                        bottom: buttonRect.bottom,
+                        width: buttonRect.width,
+                        height: buttonRect.height + 25
+                    };
+
+                    // Check for collision with expanded area
+                    if (this.checkCollision(spriteRect, expandedRect)) {
                         const spriteCenterX = spriteRect.left + spriteRect.width / 2;
                         const spriteCenterY = spriteRect.top + spriteRect.height / 2;
                         const buttonCenterY = buttonRect.top + buttonRect.height / 2;
 
-                        // Platform collision (sprite falling onto button top)
-                        if (this.velocity.y > 0 && spriteCenterY < buttonCenterY &&
-                            spriteRect.bottom <= buttonRect.top + 5) {
-                            this.landOnPlatform(buttonData, buttonRect);
-                            return true;
+                        // Platform collision (sprite falling onto or near button top)
+                        if (this.velocity.y >= 0 && spriteCenterY <= buttonCenterY) {
+                            // Calculate overlap percentage for horizontal overlap
+                            const overlapLeft = Math.max(spriteRect.left, buttonRect.left);
+                            const overlapRight = Math.min(spriteRect.right, buttonRect.right);
+                            const overlapWidth = Math.max(0, overlapRight - overlapLeft);
+                            const spriteWidth = spriteRect.width;
+                            const overlapPercentage = (overlapWidth / spriteWidth) * 100;
+
+                            // Check if pig is above or near button top and has sufficient overlap
+                            if (spriteRect.bottom <= buttonRect.top + 30 && overlapPercentage >= 50) {
+                                this.landOnPlatform(buttonData, buttonRect);
+                                return true;
+                            }
                         }
 
                         // Bottom collision (sprite hitting button from below)
