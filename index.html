@@ -576,6 +576,11 @@
 
         // Function to import data for a specific user
         function importDataForUser(username, importData) {
+            console.log('=== importDataForUser called ===');
+            console.log('Target username:', username);
+            console.log('Import data:', importData);
+            console.log('Import data keys:', Object.keys(importData));
+
             try {
                 // Set the username first
                 currentUsername = username;
@@ -4973,9 +4978,10 @@ if (chartInstances[`dotplot-${questionId}`]) {
             }
         }
 
-        function importMasterData(data) {
+        function importMasterData(data, targetUsername = null) {
             console.log('=== importMasterData called ===');
             console.log('Data passed to importMasterData:', data);
+            console.log('Target username for restoration:', targetUsername);
 
             // Use existing master data import functionality
             if (typeof mergeMasterData === 'function') {
@@ -5003,7 +5009,38 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 }
 
                 if (userData) {
-                    console.log('Found userData, importing data for', Object.keys(userData).length, 'students');
+                    // Check if this is single-user restoration (from username screen)
+                    if (targetUsername && userData[targetUsername]) {
+                        console.log(`SINGLE-USER RESTORATION: Importing only data for ${targetUsername}`);
+                        const userInfo = userData[targetUsername];
+
+                        if (userInfo.answers) {
+                            localStorage.setItem(`answers_${targetUsername}`, JSON.stringify(userInfo.answers));
+                            console.log(`✓ Restored answers for ${targetUsername}`);
+                        }
+                        if (userInfo.progress) {
+                            localStorage.setItem(`progress_${targetUsername}`, JSON.stringify(userInfo.progress));
+                            console.log(`✓ Restored progress for ${targetUsername}`);
+                        }
+                        if (userInfo.reasons) {
+                            localStorage.setItem(`reasons_${targetUsername}`, JSON.stringify(userInfo.reasons));
+                            console.log(`✓ Restored reasons for ${targetUsername}`);
+                        }
+                        if (userInfo.timestamps) {
+                            localStorage.setItem(`timestamps_${targetUsername}`, JSON.stringify(userInfo.timestamps));
+                            console.log(`✓ Restored timestamps for ${targetUsername}`);
+                        }
+                        if (userInfo.attempts) {
+                            localStorage.setItem(`attempts_${targetUsername}`, JSON.stringify(userInfo.attempts));
+                            console.log(`✓ Restored attempts for ${targetUsername}`);
+                        }
+
+                        console.log(`=== Single-user restoration completed for ${targetUsername} ===`);
+                        return;
+                    }
+
+                    // Otherwise, do multi-user peer import
+                    console.log('MULTI-USER PEER IMPORT: Importing data for', Object.keys(userData).length, 'students');
                     console.log('Student usernames:', Object.keys(userData));
 
                     Object.entries(userData).forEach(([username, userInfo]) => {
@@ -5100,6 +5137,24 @@ if (chartInstances[`dotplot-${questionId}`]) {
             const currentUserDisplay = document.getElementById('currentUserDisplay');
             if (currentUserDisplay) {
                 currentUserDisplay.textContent = localStorage.getItem('consensusUsername') || 'Unknown';
+            }
+
+            // Ensure Master Import button exists (add dynamically if missing)
+            const masterExportBtn = document.getElementById('masterExportBtn');
+            if (masterExportBtn && !document.getElementById('masterImportBtn')) {
+                console.log('Master Import button missing, adding it dynamically');
+                const masterImportBtn = document.createElement('button');
+                masterImportBtn.id = 'masterImportBtn';
+                masterImportBtn.className = 'modal-btn';
+                masterImportBtn.innerHTML = `
+                    <i class="fas fa-cloud-download-alt"></i>
+                    <span>
+                        <strong>Master Import</strong>
+                        <small>Import peer data from master database</small>
+                    </span>
+                `;
+                masterExportBtn.parentNode.appendChild(masterImportBtn);
+                console.log('Master Import button added dynamically');
             }
         }
 
