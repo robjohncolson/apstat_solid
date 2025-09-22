@@ -2914,9 +2914,37 @@ if (chartInstances[`dotplot-${questionId}`]) {
         function getOfficialExplanation(questionId) {
             // Find the question in the current questions array
             const question = currentQuestions.find(q => q.id === questionId);
+            console.log(`DEBUG getOfficialExplanation: Question found:`, question);
+
+            // Check for various possible explanation field names
             if (question && question.explanation) {
+                console.log(`DEBUG getOfficialExplanation: Explanation found: "${question.explanation}"`);
                 return question.explanation;
             }
+
+            if (question && question.rationale) {
+                console.log(`DEBUG getOfficialExplanation: Rationale found: "${question.rationale}"`);
+                return question.rationale;
+            }
+
+            if (question && question.solution) {
+                console.log(`DEBUG getOfficialExplanation: Solution found: "${question.solution}"`);
+                return question.solution;
+            }
+
+            if (question && question.reasoning) {
+                console.log(`DEBUG getOfficialExplanation: Reasoning found: "${question.reasoning}"`);
+                return question.reasoning;
+            }
+
+            // Check if attachments has explanation
+            if (question && question.attachments && question.attachments.explanation) {
+                console.log(`DEBUG getOfficialExplanation: Attachments explanation found: "${question.attachments.explanation}"`);
+                return question.attachments.explanation;
+            }
+
+            console.log(`DEBUG getOfficialExplanation: No explanation found for question ${questionId}`);
+            console.log(`DEBUG getOfficialExplanation: Available fields:`, Object.keys(question || {}));
             return null;
         }
 
@@ -2929,7 +2957,7 @@ if (chartInstances[`dotplot-${questionId}`]) {
 
             console.log(`DEBUG: correctAnswer: ${correctAnswer}, officialExplanation: ${officialExplanation}`);
 
-            if (correctAnswer && officialExplanation) {
+            if (correctAnswer) {
                 // Find or create College Board explanation section
                 let cbSection = document.getElementById(`college-board-explanation-${questionId}`);
 
@@ -2952,7 +2980,7 @@ if (chartInstances[`dotplot-${questionId}`]) {
                                 <strong>Correct Answer:</strong> ${correctAnswer}
                             </div>
                             <div class="cb-official-explanation">
-                                ${officialExplanation}
+                                ${officialExplanation || 'Official explanation not available for this question. You got it right!'}
                             </div>
                         </div>
                     `;
