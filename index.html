@@ -837,86 +837,6 @@
         });
 
         // Unified Sync Modal System
-        window.showSyncModal = function() {
-            // Remove any existing sync modal
-            const existingModal = document.getElementById('unifiedSyncModal');
-            if (existingModal) {
-                existingModal.remove();
-            }
-
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'block';
-            modal.id = 'unifiedSyncModal';
-
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <span class="close-modal" onclick="closeSyncModal()">&times;</span>
-                    <h2>⚡ Sync & Backup</h2>
-                    <p>Manage your data and collaborate with classmates</p>
-
-                    <div class="sync-sections">
-                        <!-- Student Section -->
-                        <div class="sync-section">
-                            <h3>👨‍🎓 Student Actions</h3>
-                            <div class="sync-buttons">
-                                <button onclick="exportPersonal(); closeSyncModal();" class="sync-btn primary">
-                                    <span class="btn-icon">💾</span>
-                                    <span class="btn-text">
-                                        <strong>Export My Data</strong>
-                                        <small>Download your progress</small>
-                                    </span>
-                                </button>
-                                <button onclick="document.getElementById('syncImportFile').click(); closeSyncModal();" class="sync-btn secondary">
-                                    <span class="btn-icon">📁</span>
-                                    <span class="btn-text">
-                                        <strong>Import Data</strong>
-                                        <small>Load from backup file</small>
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Teacher Section -->
-                        <div class="sync-section">
-                            <h3>👩‍🏫 Teacher Actions</h3>
-                            <div class="sync-buttons">
-                                <button onclick="exportMasterData(); closeSyncModal();" class="sync-btn master">
-                                    <span class="btn-icon">🗃️</span>
-                                    <span class="btn-text">
-                                        <strong>Master Export</strong>
-                                        <small>Export all student data</small>
-                                    </span>
-                                </button>
-                                <button onclick="document.getElementById('syncImportFile').click(); closeSyncModal();" class="sync-btn master">
-                                    <span class="btn-icon">📊</span>
-                                    <span class="btn-text">
-                                        <strong>Master Import</strong>
-                                        <small>Import class data file</small>
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="sync-info">
-                        <p><small>💡 <strong>Tip:</strong> Use Ctrl+S anytime to quickly export your data</small></p>
-                        ${currentUsername ? `<p><small>📋 Current user: <strong>${currentUsername}</strong></small></p>` : ''}
-                    </div>
-
-                    <input type="file" id="syncImportFile" accept=".json" style="display: none;" onchange="importClassData(event)">
-                </div>
-            `;
-
-            document.body.appendChild(modal);
-
-            // Close modal when clicking outside
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    closeSyncModal();
-                }
-            });
-        }
 
         window.closeSyncModal = function() {
             const modal = document.getElementById('unifiedSyncModal');
@@ -1149,27 +1069,6 @@ function renderLessonSelector(unitInfo) {
                     ${lessonButtonsHtml}
                 </div>
             </div>
-        <!-- Sync Modal -->
-        <div id="syncModal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <span class="close-modal">&times;</span>
-                <h2>Sync Options</h2>
-                <div class="sync-buttons">
-                    <button id="exportBtn" class="modal-btn">
-                        <i class="fas fa-download"></i>
-                        Export
-                    </button>
-                    <button id="importBtn" class="modal-btn">
-                        <i class="fas fa-upload"></i>
-                        Import
-                    </button>
-                    <button id="totalExportBtn" class="modal-btn">
-                        <i class="fas fa-database"></i>
-                        Total Export
-                    </button>
-                </div>
-            </div>
-        </div>
         `;
         return;
     }
@@ -1348,27 +1247,6 @@ function renderLessonSelector(unitInfo) {
                     </div>
                 </div>
 
-                <!-- Sync Modal -->
-                <div id="syncModal" class="modal" style="display: none;">
-                    <div class="modal-content">
-                        <span class="close-modal">&times;</span>
-                        <h2>Sync Options</h2>
-                        <div class="sync-buttons">
-                            <button id="exportBtn" class="modal-btn">
-                                <i class="fas fa-download"></i>
-                                Export
-                            </button>
-                            <button id="importBtn" class="modal-btn">
-                                <i class="fas fa-upload"></i>
-                                Import
-                            </button>
-                            <button id="totalExportBtn" class="modal-btn">
-                                <i class="fas fa-database"></i>
-                                Total Export
-                            </button>
-                        </div>
-                    </div>
-                </div>
                 <div id="questions-list"></div>
                 <div class="loading-msg" id="loading-msg" style="display:none;">Loading questions...</div>
             `;
@@ -2934,7 +2812,13 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 this.headerCollisions = 0;
                 this.bounceThreshold = 3; // Number of bounces before triggering action
 
+                // Button physics properties
+                this.buttons = []; // Registry of button elements for collision
+                this.onPlatform = false; // Whether sprite is standing on a button
+                this.platformElement = null; // Current platform button
+
                 this.createElement();
+                this.updateButtonRegistry(); // Initialize button detection
                 this.bindControls();
                 this.startAnimation();
             }
@@ -3089,8 +2973,23 @@ if (chartInstances[`dotplot-${questionId}`]) {
                         }
                     }
 
-                    // Ground collision
-                    if (this.y <= 100) {
+                    // Check button collisions (but not when on platform to allow walking)
+                    if (!this.onPlatform) {
+                        // Update button registry periodically for dynamic content
+                        if (Math.random() < 0.1) { // 10% chance each frame
+                            this.updateButtonRegistry();
+                        }
+
+                        // Check for button collisions
+                        if (this.checkButtonCollisions()) {
+                            // Button collision handled, don't check ground
+                            this.element.style.bottom = this.y + 'px';
+                            return;
+                        }
+                    }
+
+                    // Ground collision (only if not on platform)
+                    if (!this.onPlatform && this.y <= 100) {
                         this.y = 100;
                         this.velocity.y = 0;
                     }
@@ -3136,6 +3035,92 @@ if (chartInstances[`dotplot-${questionId}`]) {
                         spriteRect.left > welcomeRect.right ||
                         spriteRect.bottom < welcomeRect.top ||
                         spriteRect.top > welcomeRect.bottom);
+            }
+
+            updateButtonRegistry() {
+                // Find all visible button elements
+                this.buttons = [];
+                const allButtons = document.querySelectorAll('button');
+
+                allButtons.forEach(button => {
+                    const rect = button.getBoundingClientRect();
+                    // Only include visible buttons with reasonable size
+                    if (rect.width > 20 && rect.height > 20 &&
+                        rect.top < window.innerHeight && rect.bottom > 0) {
+                        this.buttons.push({
+                            element: button,
+                            rect: rect
+                        });
+                    }
+                });
+            }
+
+            checkButtonCollisions() {
+                const spriteRect = this.element.getBoundingClientRect();
+
+                for (const buttonData of this.buttons) {
+                    const buttonRect = buttonData.rect;
+
+                    if (this.checkCollision(spriteRect, buttonRect)) {
+                        // Determine collision type based on sprite movement direction
+                        const spriteCenterX = spriteRect.left + spriteRect.width / 2;
+                        const spriteCenterY = spriteRect.top + spriteRect.height / 2;
+                        const buttonCenterY = buttonRect.top + buttonRect.height / 2;
+
+                        // Platform collision (sprite falling onto button top)
+                        if (this.velocity.y > 0 && spriteCenterY < buttonCenterY &&
+                            spriteRect.bottom <= buttonRect.top + 5) {
+                            this.landOnPlatform(buttonData, buttonRect);
+                            return true;
+                        }
+
+                        // Bottom collision (sprite hitting button from below)
+                        if (this.velocity.y < 0 && spriteCenterY > buttonCenterY) {
+                            this.bounceOffBottom(buttonRect);
+                            return true;
+                        }
+                    }
+                }
+
+                // Check if sprite has walked off platform edge
+                if (this.onPlatform && this.platformElement) {
+                    const platformRect = this.platformElement.rect;
+                    if (spriteRect.right < platformRect.left || spriteRect.left > platformRect.right) {
+                        this.fallOffPlatform();
+                    }
+                }
+
+                return false;
+            }
+
+            landOnPlatform(buttonData, buttonRect) {
+                // Stop falling and land on button
+                this.y = window.innerHeight - buttonRect.top;
+                this.velocity.y = 0;
+                this.onPlatform = true;
+                this.platformElement = buttonData;
+
+                console.log('Pig landed on button platform');
+            }
+
+            bounceOffBottom(buttonRect) {
+                // Bounce off button bottom (like welcome element)
+                this.velocity.y = -Math.abs(this.velocity.y);
+
+                // Visual feedback
+                this.element.style.filter = 'brightness(120%) ' + this.getColorFilter(this.color);
+                setTimeout(() => {
+                    this.element.style.filter = this.getColorFilter(this.color);
+                }, 200);
+
+                console.log('Pig bounced off button bottom');
+            }
+
+            fallOffPlatform() {
+                // Fall off platform edge
+                this.onPlatform = false;
+                this.platformElement = null;
+                console.log('Pig fell off platform edge');
             }
 
             triggerUsernameManagement() {
@@ -3382,26 +3367,6 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     </div>
 
                     <!-- Sync Modal -->
-                    <div id="syncModal" class="modal" style="display: none;">
-                        <div class="modal-content">
-                            <span class="close-modal">&times;</span>
-                            <h2>Sync Options</h2>
-                            <div class="sync-buttons">
-                                <button id="exportBtn" class="modal-btn">
-                                    <i class="fas fa-download"></i>
-                                    Export
-                                </button>
-                                <button id="importBtn" class="modal-btn">
-                                    <i class="fas fa-upload"></i>
-                                    Import
-                                </button>
-                                <button id="totalExportBtn" class="modal-btn">
-                                    <i class="fas fa-database"></i>
-                                    Total Export
-                                </button>
-                            </div>
-                        </div>
-                    </div>
 
                 </div>
             `;
@@ -3516,26 +3481,6 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     </div>
 
                     <!-- Sync Modal -->
-                    <div id="syncModal" class="modal" style="display: none;">
-                        <div class="modal-content">
-                            <span class="close-modal">&times;</span>
-                            <h2>Sync Options</h2>
-                            <div class="sync-buttons">
-                                <button id="exportBtn" class="modal-btn">
-                                    <i class="fas fa-download"></i>
-                                    Export
-                                </button>
-                                <button id="importBtn" class="modal-btn">
-                                    <i class="fas fa-upload"></i>
-                                    Import
-                                </button>
-                                <button id="totalExportBtn" class="modal-btn">
-                                    <i class="fas fa-database"></i>
-                                    Total Export
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 `;
             }
         }
@@ -3612,27 +3557,6 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     </div>
                 </div>
 
-                <!-- Sync Modal -->
-                <div id="syncModal" class="modal" style="display: none;">
-                    <div class="modal-content">
-                        <span class="close-modal">&times;</span>
-                        <h2>Sync Options</h2>
-                        <div class="sync-buttons">
-                            <button id="exportBtn" class="modal-btn">
-                                <i class="fas fa-download"></i>
-                                Export
-                            </button>
-                            <button id="importBtn" class="modal-btn">
-                                <i class="fas fa-upload"></i>
-                                Import
-                            </button>
-                            <button id="totalExportBtn" class="modal-btn">
-                                <i class="fas fa-database"></i>
-                                Total Export
-                            </button>
-                        </div>
-                    </div>
-                </div>
                 ${videoSection}
                 <div id="questions-list"></div>
                 <div class="loading-msg" id="loading-msg" style="display:none;">Loading questions...</div>
