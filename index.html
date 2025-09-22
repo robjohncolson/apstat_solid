@@ -635,9 +635,14 @@
                     showMessage(`Username set to ${username} from import file.`, 'success');
                 }
 
-                // Initialize and show welcome
+                // Initialize and show welcome, then navigate to units
                 showUsernameWelcome();
                 initializeFromEmbeddedData();
+
+                // Auto-navigate to units page after successful import
+                setTimeout(() => {
+                    showMessage(`Successfully imported data for ${username}! Redirecting to units...`, 'success');
+                }, 500);
 
             } catch (error) {
                 showMessage('Error importing data: ' + error.message, 'error');
@@ -820,12 +825,15 @@
             const selectedStudent = csvMappingData[selectedIndex];
             const username = selectedStudent.username;
 
+            // Save data before closing modal (since closeCSVImportModal clears it)
+            const savedMasterData = masterDataForCSV;
+
             // Close modal
             closeCSVImportModal();
 
             // Import data for the selected user
             showMessage(`Importing data for ${selectedStudent.name} (${username})...`, 'info');
-            importDataForUser(username, masterDataForCSV);
+            importDataForUser(username, savedMasterData);
         }
 
         // Global ESC Key Handler for All Modals
@@ -3061,13 +3069,14 @@ if (chartInstances[`dotplot-${questionId}`]) {
                                 this.fallOffPlatform();
                             } else {
                                 // Stay on platform - maintain y position ONLY if not jumping
-                                if (this.velocity.y <= 0) {
-                                    this.y = window.innerHeight - platformRect.top;
-                                    this.velocity.y = 0;
-                                } else {
+                                if (this.velocity.y > 0) {
                                     // Jumping off platform - leave platform state
                                     this.onPlatform = false;
                                     this.platformElement = null;
+                                } else {
+                                    // Not jumping - maintain platform position
+                                    this.y = window.innerHeight - platformRect.top;
+                                    this.velocity.y = 0;
                                 }
                             }
                         }
@@ -3171,6 +3180,11 @@ if (chartInstances[`dotplot-${questionId}`]) {
 
                         // Platform collision (sprite falling onto or near button top)
                         if (this.velocity.y >= 0) {
+                            // Skip if already on this exact platform to prevent spam
+                            if (this.onPlatform && this.platformElement === buttonData) {
+                                continue;
+                            }
+
                             // Calculate overlap percentage for horizontal overlap
                             const overlapLeft = Math.max(spriteRect.left, buttonRect.left);
                             const overlapRight = Math.min(spriteRect.right, buttonRect.right);

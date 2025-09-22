@@ -1826,12 +1826,31 @@ background-color: rgba(0,0,0,0.5);
 
 .modal-content {
 background-color: white;
-margin: 10% auto;
+margin: 5% auto;
 padding: 20px;
 border-radius: 10px;
-width: 90%;
+width: 95%;
 max-width: 500px;
+max-height: 90vh;
+overflow-y: auto;
 box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Responsive modal adjustments */
+@media (max-height: 600px) {
+    .modal-content {
+        margin: 2% auto;
+        max-height: 96vh;
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-content {
+        width: 98%;
+        margin: 1% auto;
+        padding: 15px;
+    }
 }
 
 .close-modal {
@@ -1970,6 +1989,21 @@ border-color: #ff69b4;
     display: flex;
     gap: 10px;
     justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Responsive button adjustments */
+@media (max-width: 480px) {
+    .csv-import-actions {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .action-button {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+    }
 }
 
 body.dark-mode .import-step {
