@@ -21,6 +21,53 @@
 
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
     <button class="sync-button" onclick="showSyncModal()" title="Sync & Export Data">⚡</button>
+
+    <!-- Global Sync Modal -->
+    <div id="syncModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2><i class="fas fa-sync"></i> Data Management</h2>
+            <p>Current user: <strong id="currentUserDisplay"></strong></p>
+
+            <div class="sync-section">
+                <h3><i class="fas fa-user"></i> Student Actions</h3>
+                <div class="sync-buttons">
+                    <button id="saveBtn" class="modal-btn">
+                        <i class="fas fa-save"></i>
+                        <span>
+                            <strong>Save</strong>
+                            <small>Export your personal data</small>
+                        </span>
+                    </button>
+                    <button id="openBtn" class="modal-btn">
+                        <i class="fas fa-folder-open"></i>
+                        <span>
+                            <strong>Open</strong>
+                            <small>Import any database file</small>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="sync-section">
+                <h3><i class="fas fa-chalkboard-teacher"></i> Teacher Actions</h3>
+                <div class="sync-buttons">
+                    <button id="masterExportBtn" class="modal-btn">
+                        <i class="fas fa-database"></i>
+                        <span>
+                            <strong>Master Export</strong>
+                            <small>Export all users' data</small>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="sync-footer">
+                <small><i class="fas fa-keyboard"></i> Tip: Press Ctrl+S to quickly access sync options</small>
+            </div>
+        </div>
+    </div>
+
 <script src="data/curriculum.js"></script>
     <script src="data/units.js"></script>
     <script>
@@ -1110,52 +1157,6 @@ function renderLessonSelector(unitInfo) {
             <p>Select a lesson to begin:</p>
             <div class="lesson-buttons">
                 ${lessonButtonsHtml}
-            </div>
-        </div>
-
-        <!-- Sync Modal -->
-        <div id="syncModal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <span class="close-modal">&times;</span>
-                <h2><i class="fas fa-sync"></i> Data Management</h2>
-                <p>Current user: <strong id="currentUserDisplay"></strong></p>
-
-                <div class="sync-section">
-                    <h3><i class="fas fa-user"></i> Student Actions</h3>
-                    <div class="sync-buttons">
-                        <button id="saveBtn" class="modal-btn">
-                            <i class="fas fa-save"></i>
-                            <span>
-                                <strong>Save</strong>
-                                <small>Export your personal data</small>
-                            </span>
-                        </button>
-                        <button id="openBtn" class="modal-btn">
-                            <i class="fas fa-folder-open"></i>
-                            <span>
-                                <strong>Open</strong>
-                                <small>Import any database file</small>
-                            </span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="sync-section">
-                    <h3><i class="fas fa-chalkboard-teacher"></i> Teacher Actions</h3>
-                    <div class="sync-buttons">
-                        <button id="masterExportBtn" class="modal-btn">
-                            <i class="fas fa-database"></i>
-                            <span>
-                                <strong>Master Export</strong>
-                                <small>Export all users' data</small>
-                            </span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="sync-footer">
-                    <small><i class="fas fa-keyboard"></i> Tip: Press Ctrl+S to quickly access sync options</small>
-                </div>
             </div>
         </div>
     `;
@@ -2973,14 +2974,29 @@ if (chartInstances[`dotplot-${questionId}`]) {
                         }
                     }
 
-                    // Check button collisions (but not when on platform to allow walking)
-                    if (!this.onPlatform) {
-                        // Update button registry periodically for dynamic content
-                        if (Math.random() < 0.1) { // 10% chance each frame
-                            this.updateButtonRegistry();
-                        }
+                    // Check button collisions
+                    // Update button registry periodically for dynamic content
+                    if (Math.random() < 0.1) { // 10% chance each frame
+                        this.updateButtonRegistry();
+                    }
 
-                        // Check for button collisions
+                    if (this.onPlatform) {
+                        // When on platform, maintain position and check for edge fall
+                        if (this.platformElement) {
+                            const platformRect = this.platformElement.element.getBoundingClientRect();
+                            const spriteRect = this.element.getBoundingClientRect();
+
+                            // Check if walked off edge
+                            if (spriteRect.right < platformRect.left || spriteRect.left > platformRect.right) {
+                                this.fallOffPlatform();
+                            } else {
+                                // Stay on platform - maintain y position
+                                this.y = window.innerHeight - platformRect.top;
+                                this.velocity.y = 0;
+                            }
+                        }
+                    } else {
+                        // Not on platform - check for new button collisions
                         if (this.checkButtonCollisions()) {
                             // Button collision handled, don't check ground
                             this.element.style.bottom = this.y + 'px';
@@ -3084,7 +3100,8 @@ if (chartInstances[`dotplot-${questionId}`]) {
 
                 // Check if sprite has walked off platform edge
                 if (this.onPlatform && this.platformElement) {
-                    const platformRect = this.platformElement.rect;
+                    // Get current platform position (not cached)
+                    const platformRect = this.platformElement.element.getBoundingClientRect();
                     if (spriteRect.right < platformRect.left || spriteRect.left > platformRect.right) {
                         this.fallOffPlatform();
                     }
@@ -3095,12 +3112,13 @@ if (chartInstances[`dotplot-${questionId}`]) {
 
             landOnPlatform(buttonData, buttonRect) {
                 // Stop falling and land on button
+                // Calculate correct y position: pig bottom should touch button top
                 this.y = window.innerHeight - buttonRect.top;
                 this.velocity.y = 0;
                 this.onPlatform = true;
                 this.platformElement = buttonData;
 
-                console.log('Pig landed on button platform');
+                console.log(`Pig landed on button platform at y=${this.y}, button top=${buttonRect.top}, screen height=${window.innerHeight}`);
             }
 
             bounceOffBottom(buttonRect) {
@@ -3967,7 +3985,16 @@ if (chartInstances[`dotplot-${questionId}`]) {
         // Show sync modal
         function showSyncModal() {
             initializeSyncModal();
-            document.getElementById('syncModal').style.display = 'block';
+
+            const modal = document.getElementById('syncModal');
+            if (modal) {
+                modal.style.display = 'block';
+            } else {
+                console.error('Sync modal element not found!');
+                // Fallback: try to find any modal with sync-related content
+                const allModals = document.querySelectorAll('.modal');
+                console.log('Available modals:', allModals);
+            }
         }
 
         // Initialize when page loads
