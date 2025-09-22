@@ -1439,13 +1439,24 @@ function renderLessonSelector(unitInfo) {
             const attempts = getAttemptCount(question.id);
             const canRetryQuestion = canRetry(question.id);
 
+            // Check if answer is correct (for styling)
+            let isCorrect = false;
+            if (isAnswered) {
+                const correctAnswer = getCorrectAnswer(question.id);
+                const userAnswer = classData.users[currentUsername]?.answers?.[question.id];
+                const userAnswerValue = userAnswer?.value || userAnswer;
+                if (correctAnswer && userAnswerValue) {
+                    isCorrect = (userAnswerValue.toString().toLowerCase().trim() === correctAnswer.toString().toLowerCase().trim());
+                }
+            }
+
             // Create two-column layout structure
             let html = `
                 <div class="quiz-container two-column-layout" data-question-id="${question.id}" data-question-number="${questionNumber}">
                     <div class="question-main-column">
-                        <div class="question-header">
+                        <div class="question-header ${isCorrect ? 'correct-answer' : ''}">
                             <span>Question ${questionNumber}</span>
-                            ${isAnswered ? '<span style="color: #a5d6a7;">✓ Answered</span>' : ''}
+                            ${isAnswered ? (isCorrect ? '<span style="color: #f39c12;">⭐ Correctly Answered</span>' : '<span style="color: #a5d6a7;">✓ Answered</span>') : ''}
                         </div>
                         <div class="question-id">ID: ${question.id || 'N/A'}</div>
                         <div class="question-prompt">${question.prompt || 'No prompt provided'}</div>
@@ -1625,11 +1636,32 @@ function renderLessonSelector(unitInfo) {
                 return 0;
             });
 
+            // Check if answer key has been revealed for this question
+            const answerKeySection = document.getElementById(`answer-key-${questionId}`);
+            const cbSection = document.getElementById(`college-board-explanation-${questionId}`);
+            const answerKeyRevealed = (answerKeySection && answerKeySection.style.display === 'block') ||
+                                    (cbSection && cbSection.style.display === 'block');
+
+            console.log(`DEBUG populatePeerReasoning: ${questionId} - answerKeySection exists: ${!!answerKeySection}, cbSection exists: ${!!cbSection}`);
+            console.log(`DEBUG populatePeerReasoning: ${questionId} - answerKeyRevealed: ${answerKeyRevealed}`);
+
             let html = '';
             peerResponses.forEach(peer => {
                 const hasReason = peer.reason && peer.reason.trim().length > 0;
-                const isCorrect = peer.isCorrect || false; // Will implement majority logic later
+
+                // Determine if this peer's answer is correct (only if answer key is revealed)
+                let isCorrect = false;
                 const isCollegeBoard = peer.username === 'college_board';
+
+                if (answerKeyRevealed || isCollegeBoard) {
+                    const correctAnswer = getCorrectAnswer(questionId);
+                    if (correctAnswer && (peer.choice || peer.response)) {
+                        const peerAnswer = peer.choice || peer.response;
+                        isCorrect = (peerAnswer.toString().toLowerCase().trim() === correctAnswer.toString().toLowerCase().trim());
+                    }
+                }
+
+                console.log(`DEBUG: Peer ${peer.username} - answer: ${peer.choice || peer.response}, isCorrect: ${isCorrect}, answerKeyRevealed: ${answerKeyRevealed}`);
 
                 html += `
                     <div class="peer-response-card ${isCorrect ? 'correct' : 'incorrect'} ${isCollegeBoard ? 'college-board-official' : ''}">
@@ -2973,6 +3005,7 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 }
 
                 if (cbSection) {
+                    cbSection.style.display = 'block'; // Ensure it's visible for answer key detection
                     cbSection.innerHTML = `
                         <div class="college-board-content">
                             <h4>🏛️ College Board Official Explanation</h4>
@@ -2994,6 +3027,19 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     }
 
                     console.log(`DEBUG: College Board explanation displayed for ${questionId}`);
+
+                    // Refresh peer responses to update correctness colors IMMEDIATELY
+                    console.log(`DEBUG: About to refresh peer responses for color update`);
+                    const question = currentQuestions.find(q => q.id === questionId);
+                    if (question) {
+                        // Add a small delay to ensure DOM is fully updated
+                        setTimeout(() => {
+                            populatePeerResponses(questionId, question.type);
+                            console.log(`DEBUG: Peer responses refreshed for ${questionId} (after timeout)`);
+                        }, 100);
+                    } else {
+                        console.log(`DEBUG: Question not found for refresh: ${questionId}`);
+                    }
                 }
             } else {
                 console.log(`DEBUG: Missing data - correctAnswer: ${correctAnswer}, explanation: ${officialExplanation}`);
