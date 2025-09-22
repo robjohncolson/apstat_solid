@@ -2303,9 +2303,22 @@ function renderAttachments(attachments, questionId) {
                 }
             }
 
-            // Show success message
+            // Show success message with correctness feedback
             if (successSpan) {
-                successSpan.textContent = 'Answer submitted successfully!';
+                const correctAnswer = getCorrectAnswer(questionId);
+                let isCorrect = false;
+                if (correctAnswer && value) {
+                    isCorrect = (value.toString().toLowerCase().trim() === correctAnswer.toString().toLowerCase().trim());
+                }
+
+                if (isCorrect) {
+                    successSpan.textContent = '✅ Correct answer submitted!';
+                    successSpan.style.color = '#27ae60';
+                } else {
+                    successSpan.textContent = '📝 Answer submitted successfully!';
+                    successSpan.style.color = '#3498db';
+                }
+
                 successSpan.classList.add('show');
                 setTimeout(() => {
                     successSpan.classList.remove('show');
@@ -2363,8 +2376,16 @@ function renderAttachments(attachments, questionId) {
 
             // Trigger answer key display logic
             const correctAnswer = getCorrectAnswer(questionId);
-            const isCorrect = (value.toLowerCase() === correctAnswer.toLowerCase());
+            console.log(`DEBUG: User answer: "${value}", Correct answer: "${correctAnswer}"`);
+
+            let isCorrect = false;
+            if (correctAnswer && value) {
+                isCorrect = (value.toString().toLowerCase().trim() === correctAnswer.toString().toLowerCase().trim());
+            }
+            console.log(`DEBUG: Answer is ${isCorrect ? 'CORRECT' : 'INCORRECT'}`);
+
             const hasExplanation = (reason && reason.length > 0);
+            console.log(`DEBUG: Has explanation: ${hasExplanation}`);
 
             displayAnswerKey(questionId, isCorrect, hasExplanation, attempts + 1);
         }
@@ -2830,6 +2851,133 @@ if (chartInstances[`dotplot-${questionId}`]) {
             // Update placeholder text
             if (reasonTextarea) {
                 reasonTextarea.placeholder = 'Explanation saved. You can now update your answer.';
+            }
+        }
+
+        // Get correct answer from curriculum data
+        function getCorrectAnswer(questionId) {
+            // Find the question in the current questions array
+            const question = currentQuestions.find(q => q.id === questionId);
+            console.log(`DEBUG getCorrectAnswer: Question found:`, question);
+
+            // Check for answerKey field (most common)
+            if (question && question.answerKey) {
+                console.log(`DEBUG getCorrectAnswer: Answer key found: "${question.answerKey}"`);
+                return question.answerKey;
+            }
+
+            // Check for correct_answer field
+            if (question && question.correct_answer) {
+                console.log(`DEBUG getCorrectAnswer: Correct answer found: "${question.correct_answer}"`);
+                return question.correct_answer;
+            }
+
+            // Check for answer field
+            if (question && question.answer) {
+                console.log(`DEBUG getCorrectAnswer: Answer field found: "${question.answer}"`);
+                return question.answer;
+            }
+
+            console.log(`DEBUG getCorrectAnswer: No correct answer found for question ${questionId}`);
+            return null;
+        }
+
+        // Get official explanation from curriculum data
+        function getOfficialExplanation(questionId) {
+            // Find the question in the current questions array
+            const question = currentQuestions.find(q => q.id === questionId);
+            if (question && question.explanation) {
+                return question.explanation;
+            }
+            return null;
+        }
+
+        // Display answer key with timer-based logic
+        function displayAnswerKey(questionId, isCorrect, hasExplanation, attemptNumber) {
+            const answerKeySection = document.getElementById(`answer-key-${questionId}`);
+            const correctAnswerDiv = document.getElementById(`correct-answer-${questionId}`);
+            const officialExplanationDiv = document.getElementById(`official-explanation-${questionId}`);
+
+            if (!answerKeySection) return;
+
+            // Clear any existing timers for this question
+            if (window.answerKeyTimers && window.answerKeyTimers[questionId]) {
+                clearTimeout(window.answerKeyTimers[questionId]);
+                delete window.answerKeyTimers[questionId];
+            }
+
+            // Initialize timers object if needed
+            if (!window.answerKeyTimers) {
+                window.answerKeyTimers = {};
+            }
+
+            // Get correct answer and explanation
+            const correctAnswer = getCorrectAnswer(questionId);
+            const officialExplanation = getOfficialExplanation(questionId);
+
+            // Populate answer key content
+            if (correctAnswerDiv && correctAnswer) {
+                correctAnswerDiv.innerHTML = `<strong>Correct Answer:</strong> ${correctAnswer}`;
+            }
+
+            if (officialExplanationDiv && officialExplanation) {
+                officialExplanationDiv.innerHTML = `<strong>Official Explanation:</strong><br>${officialExplanation}`;
+            }
+
+            // Apply timer logic based on user's performance
+            if (attemptNumber === 1) {
+                // First attempt
+                if (isCorrect && hasExplanation) {
+                    // ✅ Correct + Explanation: Immediate answer key
+                    answerKeySection.style.display = 'block';
+                    console.log(`Answer key shown immediately: correct with explanation for ${questionId}`);
+                } else if (isCorrect && !hasExplanation) {
+                    // ⏰ Correct + No Explanation: 15-minute timer
+                    console.log(`Starting 15-minute timer for ${questionId} (correct, no explanation)`);
+                    window.answerKeyTimers[questionId] = setTimeout(() => {
+                        answerKeySection.style.display = 'block';
+                        showMessage('Answer key revealed after 15 minutes (correct answer)', 'info');
+                    }, 15 * 60 * 1000); // 15 minutes
+                } else {
+                    // ❌ Incorrect: No answer key until explanation provided or max attempts
+                    console.log(`Answer key blocked for ${questionId} (incorrect answer)`);
+                }
+            } else if (attemptNumber === 2) {
+                // Second attempt
+                if (isCorrect && hasExplanation) {
+                    // ✅ Correct on retry + Explanation: Immediate answer key
+                    answerKeySection.style.display = 'block';
+                    console.log(`Answer key shown immediately: correct on retry with explanation for ${questionId}`);
+                } else if (isCorrect && !hasExplanation) {
+                    // ⏰ Correct on retry + No Explanation: 15-minute timer
+                    console.log(`Starting 15-minute timer for ${questionId} (correct on retry, no explanation)`);
+                    window.answerKeyTimers[questionId] = setTimeout(() => {
+                        answerKeySection.style.display = 'block';
+                        showMessage('Answer key revealed after 15 minutes (correct on retry)', 'info');
+                    }, 15 * 60 * 1000); // 15 minutes
+                }
+            } else if (attemptNumber >= 3) {
+                // Third attempt reached
+                if (!isCorrect) {
+                    // Still wrong after 3 attempts: 5-minute timer
+                    console.log(`Starting 5-minute timer for ${questionId} (wrong after 3 attempts)`);
+                    window.answerKeyTimers[questionId] = setTimeout(() => {
+                        answerKeySection.style.display = 'block';
+                        showMessage('Answer key revealed after 5 minutes (3 incorrect attempts)', 'warning');
+                    }, 5 * 60 * 1000); // 5 minutes
+                } else if (hasExplanation) {
+                    // ✅ Correct on retry + Explanation: Immediate answer key
+                    answerKeySection.style.display = 'block';
+                    console.log(`Answer key shown immediately: correct on retry with explanation for ${questionId}`);
+                }
+            }
+        }
+
+        // Function to show/hide answer key manually (for testing or override)
+        function toggleAnswerKey(questionId, show = true) {
+            const answerKeySection = document.getElementById(`answer-key-${questionId}`);
+            if (answerKeySection) {
+                answerKeySection.style.display = show ? 'block' : 'none';
             }
         }
 

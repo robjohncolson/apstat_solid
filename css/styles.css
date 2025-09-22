@@ -2358,6 +2358,80 @@ body.dark-mode .import-step select {
     box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.25);
 }
 
+/* Answer Key Section */
+.answer-key-section {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 2px solid #f39c12;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 4px 8px rgba(243, 156, 18, 0.2);
+}
+
+.answer-key-content h4 {
+    color: #d68910;
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.answer-key-content h4::before {
+    content: "🔑";
+    font-size: 20px;
+}
+
+.correct-answer {
+    background: white;
+    border: 1px solid #f39c12;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.correct-answer strong {
+    color: #d68910;
+}
+
+.official-explanation {
+    background: white;
+    border: 1px solid #f39c12;
+    border-radius: 6px;
+    padding: 12px;
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+.official-explanation strong {
+    color: #d68910;
+    display: block;
+    margin-bottom: 8px;
+}
+
+/* Dark mode answer key styling */
+body.dark-mode .answer-key-section {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    border-color: #f39c12;
+}
+
+body.dark-mode .answer-key-content h4 {
+    color: #f39c12;
+}
+
+body.dark-mode .correct-answer,
+body.dark-mode .official-explanation {
+    background: #1a252f;
+    border-color: #f39c12;
+    color: #ecf0f1;
+}
+
+body.dark-mode .correct-answer strong,
+body.dark-mode .official-explanation strong {
+    color: #f39c12;
+}
+
 /* Loading and hint states */
 .peer-loading, .peer-hint {
     text-align: center;
