@@ -2432,6 +2432,140 @@ body.dark-mode .official-explanation strong {
     color: #f39c12;
 }
 
+/* College Board Official Peer Entry */
+.peer-response-card.college-board-official {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 2px solid #f39c12;
+    border-left: 6px solid #d68910;
+    box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.peer-response-card.college-board-official::before {
+    content: "OFFICIAL";
+    position: absolute;
+    top: -8px;
+    right: 10px;
+    background: #f39c12;
+    color: white;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+}
+
+.peer-response-card.college-board-official .peer-name {
+    color: #d68910;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.peer-response-card.college-board-official .peer-reasoning-text.official-explanation {
+    background: white;
+    border: 1px solid #f39c12;
+    font-weight: 500;
+    color: #856404;
+    font-style: normal;
+}
+
+/* Dark mode College Board styling */
+body.dark-mode .peer-response-card.college-board-official {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    border-color: #f39c12;
+}
+
+body.dark-mode .peer-response-card.college-board-official .peer-name {
+    color: #f39c12;
+}
+
+body.dark-mode .peer-response-card.college-board-official .peer-reasoning-text.official-explanation {
+    background: #1a252f;
+    border-color: #f39c12;
+    color: #f39c12;
+}
+
+/* College Board Explanation Section (below question) */
+.college-board-explanation-section {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 3px solid #f39c12;
+    border-radius: 12px;
+    padding: 25px;
+    margin-top: 20px;
+    box-shadow: 0 6px 20px rgba(243, 156, 18, 0.3);
+    position: relative;
+}
+
+.college-board-explanation-section::before {
+    content: "OFFICIAL EXPLANATION";
+    position: absolute;
+    top: -12px;
+    left: 20px;
+    background: #f39c12;
+    color: white;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+    letter-spacing: 1px;
+}
+
+.college-board-content h4 {
+    color: #d68910;
+    margin: 0 0 20px 0;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cb-correct-answer {
+    background: white;
+    border: 2px solid #f39c12;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #d68910;
+}
+
+.cb-official-explanation {
+    background: white;
+    border: 2px solid #f39c12;
+    border-radius: 8px;
+    padding: 20px;
+    line-height: 1.7;
+    font-size: 16px;
+    color: #856404;
+}
+
+/* Dark mode College Board explanation */
+body.dark-mode .college-board-explanation-section {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    border-color: #f39c12;
+}
+
+body.dark-mode .college-board-content h4 {
+    color: #f39c12;
+}
+
+body.dark-mode .cb-correct-answer,
+body.dark-mode .cb-official-explanation {
+    background: #1a252f;
+    border-color: #f39c12;
+    color: #f39c12;
+}
+
+body.dark-mode .cb-correct-answer {
+    color: #f39c12;
+}
+
+body.dark-mode .cb-official-explanation {
+    color: #ecf0f1;
+}
+
 /* Loading and hint states */
 .peer-loading, .peer-hint {
     text-align: center;

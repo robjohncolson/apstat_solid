@@ -1566,6 +1566,30 @@ function renderLessonSelector(unitInfo) {
             setTimeout(() => {
                 if (isAnswered) {
                     populatePeerResponses(question.id, question.type);
+
+                    // Check if answer was correct and should show College Board explanation
+                    const userAnswer = classData.users[currentUsername]?.answers?.[question.id];
+                    const userReason = classData.users[currentUsername]?.reasons?.[question.id];
+                    const correctAnswer = getCorrectAnswer(question.id);
+
+                    if (userAnswer && correctAnswer) {
+                        const userValue = userAnswer.value || userAnswer;
+                        const isCorrect = (userValue.toString().toLowerCase().trim() === correctAnswer.toString().toLowerCase().trim());
+                        const hasExplanation = (userReason && userReason.trim().length > 0);
+
+                        console.log(`DEBUG: On load - isCorrect: ${isCorrect}, hasExplanation: ${hasExplanation}`);
+
+                        // Show College Board explanation if conditions are met
+                        if (isCorrect && hasExplanation) {
+                            displayCollegeBoardExplanation(question.id);
+                            // Also change textarea border to gold
+                            const reasonTextarea = document.getElementById(`reason-${question.id}`);
+                            if (reasonTextarea) {
+                                reasonTextarea.style.borderColor = '#f39c12';
+                                reasonTextarea.style.boxShadow = '0 0 0 0.2rem rgba(243, 156, 18, 0.25)';
+                            }
+                        }
+                    }
                 }
             }, 100);
 
@@ -1605,16 +1629,20 @@ function renderLessonSelector(unitInfo) {
             peerResponses.forEach(peer => {
                 const hasReason = peer.reason && peer.reason.trim().length > 0;
                 const isCorrect = peer.isCorrect || false; // Will implement majority logic later
+                const isCollegeBoard = peer.username === 'college_board';
 
                 html += `
-                    <div class="peer-response-card ${isCorrect ? 'correct' : 'incorrect'}">
-                        <div class="peer-name">${peer.username} ${isCorrect ? '✓' : ''}</div>
+                    <div class="peer-response-card ${isCorrect ? 'correct' : 'incorrect'} ${isCollegeBoard ? 'college-board-official' : ''}">
+                        <div class="peer-name">
+                            ${isCollegeBoard ? '🏛️ College Board (Official)' : peer.username}
+                            ${isCorrect || isCollegeBoard ? '✓' : ''}
+                        </div>
                         <div class="peer-answer"><strong>Answer:</strong> ${peer.choice || peer.response}</div>
                         ${hasReason ? `
-                            <div class="peer-reasoning-text">${peer.reason}</div>
+                            <div class="peer-reasoning-text ${isCollegeBoard ? 'official-explanation' : ''}">${peer.reason}</div>
                         ` : '<div class="peer-reasoning-text" style="color: #999; font-style: italic;">No explanation provided</div>'}
 
-                        ${peer.response ? `
+                        ${peer.response && !isCollegeBoard ? `
                             <div class="peer-voting-buttons" style="margin-top: 10px;">
                                 <button onclick="voteFRQ('${questionId}', '${peer.username}', 'helpful')" class="vote-btn helpful">
                                     💡 Helpful (${getVoteCount(questionId, peer.username, 'helpful')})
@@ -2892,6 +2920,58 @@ if (chartInstances[`dotplot-${questionId}`]) {
             return null;
         }
 
+        // Display College Board explanation below question (not in localStorage)
+        function displayCollegeBoardExplanation(questionId) {
+            console.log(`DEBUG: displayCollegeBoardExplanation called for ${questionId}`);
+
+            const correctAnswer = getCorrectAnswer(questionId);
+            const officialExplanation = getOfficialExplanation(questionId);
+
+            console.log(`DEBUG: correctAnswer: ${correctAnswer}, officialExplanation: ${officialExplanation}`);
+
+            if (correctAnswer && officialExplanation) {
+                // Find or create College Board explanation section
+                let cbSection = document.getElementById(`college-board-explanation-${questionId}`);
+
+                if (!cbSection) {
+                    // Create the section below the answer key section
+                    const answerKeySection = document.getElementById(`answer-key-${questionId}`);
+                    if (answerKeySection) {
+                        cbSection = document.createElement('div');
+                        cbSection.id = `college-board-explanation-${questionId}`;
+                        cbSection.className = 'college-board-explanation-section';
+                        answerKeySection.parentNode.insertBefore(cbSection, answerKeySection.nextSibling);
+                    }
+                }
+
+                if (cbSection) {
+                    cbSection.innerHTML = `
+                        <div class="college-board-content">
+                            <h4>🏛️ College Board Official Explanation</h4>
+                            <div class="cb-correct-answer">
+                                <strong>Correct Answer:</strong> ${correctAnswer}
+                            </div>
+                            <div class="cb-official-explanation">
+                                ${officialExplanation}
+                            </div>
+                        </div>
+                    `;
+                    cbSection.style.display = 'block';
+
+                    // Change reasoning textarea border to gold
+                    const reasonTextarea = document.getElementById(`reason-${questionId}`);
+                    if (reasonTextarea) {
+                        reasonTextarea.style.borderColor = '#f39c12';
+                        reasonTextarea.style.boxShadow = '0 0 0 0.2rem rgba(243, 156, 18, 0.25)';
+                    }
+
+                    console.log(`DEBUG: College Board explanation displayed for ${questionId}`);
+                }
+            } else {
+                console.log(`DEBUG: Missing data - correctAnswer: ${correctAnswer}, explanation: ${officialExplanation}`);
+            }
+        }
+
         // Display answer key with timer-based logic
         function displayAnswerKey(questionId, isCorrect, hasExplanation, attemptNumber) {
             const answerKeySection = document.getElementById(`answer-key-${questionId}`);
@@ -2915,7 +2995,7 @@ if (chartInstances[`dotplot-${questionId}`]) {
             const correctAnswer = getCorrectAnswer(questionId);
             const officialExplanation = getOfficialExplanation(questionId);
 
-            // Populate answer key content
+            // Populate answer key content (but we'll primarily show this in peer section now)
             if (correctAnswerDiv && correctAnswer) {
                 correctAnswerDiv.innerHTML = `<strong>Correct Answer:</strong> ${correctAnswer}`;
             }
@@ -2928,14 +3008,16 @@ if (chartInstances[`dotplot-${questionId}`]) {
             if (attemptNumber === 1) {
                 // First attempt
                 if (isCorrect && hasExplanation) {
-                    // ✅ Correct + Explanation: Immediate answer key
+                    // ✅ Correct + Explanation: Immediate answer key and College Board explanation
                     answerKeySection.style.display = 'block';
+                    displayCollegeBoardExplanation(questionId);
                     console.log(`Answer key shown immediately: correct with explanation for ${questionId}`);
                 } else if (isCorrect && !hasExplanation) {
                     // ⏰ Correct + No Explanation: 15-minute timer
                     console.log(`Starting 15-minute timer for ${questionId} (correct, no explanation)`);
                     window.answerKeyTimers[questionId] = setTimeout(() => {
                         answerKeySection.style.display = 'block';
+                        displayCollegeBoardExplanation(questionId);
                         showMessage('Answer key revealed after 15 minutes (correct answer)', 'info');
                     }, 15 * 60 * 1000); // 15 minutes
                 } else {
@@ -2945,14 +3027,16 @@ if (chartInstances[`dotplot-${questionId}`]) {
             } else if (attemptNumber === 2) {
                 // Second attempt
                 if (isCorrect && hasExplanation) {
-                    // ✅ Correct on retry + Explanation: Immediate answer key
+                    // ✅ Correct on retry + Explanation: Immediate answer key and College Board explanation
                     answerKeySection.style.display = 'block';
+                    displayCollegeBoardExplanation(questionId);
                     console.log(`Answer key shown immediately: correct on retry with explanation for ${questionId}`);
                 } else if (isCorrect && !hasExplanation) {
                     // ⏰ Correct on retry + No Explanation: 15-minute timer
                     console.log(`Starting 15-minute timer for ${questionId} (correct on retry, no explanation)`);
                     window.answerKeyTimers[questionId] = setTimeout(() => {
                         answerKeySection.style.display = 'block';
+                        displayCollegeBoardExplanation(questionId);
                         showMessage('Answer key revealed after 15 minutes (correct on retry)', 'info');
                     }, 15 * 60 * 1000); // 15 minutes
                 }
@@ -2963,11 +3047,13 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     console.log(`Starting 5-minute timer for ${questionId} (wrong after 3 attempts)`);
                     window.answerKeyTimers[questionId] = setTimeout(() => {
                         answerKeySection.style.display = 'block';
+                        displayCollegeBoardExplanation(questionId);
                         showMessage('Answer key revealed after 5 minutes (3 incorrect attempts)', 'warning');
                     }, 5 * 60 * 1000); // 5 minutes
                 } else if (hasExplanation) {
-                    // ✅ Correct on retry + Explanation: Immediate answer key
+                    // ✅ Correct on retry + Explanation: Immediate answer key and College Board explanation
                     answerKeySection.style.display = 'block';
+                    displayCollegeBoardExplanation(questionId);
                     console.log(`Answer key shown immediately: correct on retry with explanation for ${questionId}`);
                 }
             }
