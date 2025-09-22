@@ -5166,15 +5166,34 @@ if (chartInstances[`dotplot-${questionId}`]) {
             if (modal) {
                 modal.style.display = 'block';
 
-                // Debug: Check if Master Import button exists
+                // Debug: Check if Master Import button exists and add if missing
                 setTimeout(() => {
-                    const masterImportBtn = document.getElementById('masterImportBtn');
+                    let masterImportBtn = document.getElementById('masterImportBtn');
                     console.log('Master Import button exists:', !!masterImportBtn);
+
                     if (masterImportBtn) {
                         console.log('Master Import button element:', masterImportBtn);
                     } else {
                         console.error('Master Import button NOT FOUND in DOM!');
                         console.log('All buttons in modal:', modal.querySelectorAll('button'));
+
+                        // Force add the button
+                        const masterExportBtn = document.getElementById('masterExportBtn');
+                        if (masterExportBtn) {
+                            console.log('Adding Master Import button manually...');
+                            masterImportBtn = document.createElement('button');
+                            masterImportBtn.id = 'masterImportBtn';
+                            masterImportBtn.className = 'modal-btn';
+                            masterImportBtn.innerHTML = `
+                                <i class="fas fa-cloud-download-alt"></i>
+                                <span>
+                                    <strong>Master Import</strong>
+                                    <small>Import peer data from master database</small>
+                                </span>
+                            `;
+                            masterExportBtn.parentNode.appendChild(masterImportBtn);
+                            console.log('Master Import button added manually!');
+                        }
                     }
                 }, 100);
             } else {
