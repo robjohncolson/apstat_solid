@@ -5236,3 +5236,1207 @@ loadLesson() -> renderQuiz() -> renderQuestion() -> loadProgress() -> renderVisi
 // Quiz rendering calls this for each question
 renderQuiz() -> renderQuestion(question, index) -> renderAttachments() -> [returns HTML]
 ```
+
+---
+
+## Functions 86-100 (Continued Analysis)
+
+### Function: populatePeerReasoning
+**Location**: File: index.html, Lines: 1654-1738
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Creates and displays peer response cards with answers and explanations, handling correctness indicators and voting functionality when answer keys are revealed.
+
+**Inputs**:
+- Parameters:
+  - `questionId` (string): Question identifier, required
+  - `contributors` (array): Array of peer response objects, required
+- Global Variables Read:
+  - `currentUsername`: To filter out current user's responses
+- DOM Elements Accessed:
+  - `peer-reasoning-content-${questionId}`: Container for peer responses
+  - `peer-count-${questionId}`: Peer count display
+  - `answer-key-${questionId}`: Answer key section for correctness checking
+  - `college-board-explanation-${questionId}`: College Board explanation section
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1658-1661: Validates DOM elements and filters out current user
+2. Lines 1664-1670: Updates peer count display
+3. Lines 1674-1680: Sorts responses by reasoning quality
+4. Lines 1682-1689: Checks if answer key has been revealed for correctness display
+5. Lines 1692-1735: Creates peer response cards with conditional correctness indicators and voting buttons
+6. Line 1737: Updates DOM with generated HTML
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Updates peer-reasoning-content container with response cards
+  - Updates peer count display
+- localStorage Keys Written: None
+- Side Effects: Console logging, creates interactive voting buttons
+
+**Dependencies**:
+- Calls Functions: getCorrectAnswer(), getVoteCount()
+- Called By: populatePeerResponses(), answer submission workflows
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for DOM element existence
+- Failure modes: Returns early if key DOM elements missing
+
+**Risk Assessment**:
+- Complexity Score: 8/10
+- Lines of Code: 85
+- Cyclomatic Complexity: 12
+- Risk Factors:
+  - [x] COMPLEX FUNCTION - HIGH RISK
+  - [x] Large HTML string construction with user data
+  - [x] Multiple conditional rendering paths
+  - [x] No HTML sanitization for user-generated content
+  - [x] Complex DOM traversal for answer key detection
+
+**Example Call Chain**:
+```javascript
+// Peer response display after answer submission
+populatePeerResponses() -> populatePeerReasoning(questionId, contributors) -> getCorrectAnswer()
+```
+
+---
+
+### Function: populatePeerResponses
+**Location**: File: index.html, Lines: 1741-1770
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Gathers all user responses for a question from classData and formats them for peer reasoning display.
+
+**Inputs**:
+- Parameters:
+  - `questionId` (string): Question identifier to gather responses for, required
+  - `questionType` (string): Type of question ('multiple-choice' or other), required
+- Global Variables Read:
+  - `classData`: Source of all user answer and reasoning data
+- DOM Elements Accessed: None directly
+- localStorage Keys Read: None
+
+**Processing**:
+1. Line 1742: Initializes contributors array
+2. Lines 1745-1766: Iterates through all users in classData
+3. Lines 1746-1764: Extracts answer and reasoning data for each user
+4. Lines 1751-1756: Formats MCQ responses with choice and reason
+5. Lines 1758-1763: Formats FRQ responses with response and reason
+6. Line 1769: Calls populatePeerReasoning with gathered data
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications: Indirect through populatePeerReasoning
+- localStorage Keys Written: None
+- Side Effects: Triggers peer reasoning display
+
+**Dependencies**:
+- Calls Functions: populatePeerReasoning()
+- Called By: Answer submission functions, peer data refresh
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Basic object property checks with optional chaining
+- Failure modes: Could process incomplete data if classData is malformed
+
+**Risk Assessment**:
+- Complexity Score: 5/10
+- Lines of Code: 30
+- Cyclomatic Complexity: 5
+- Risk Factors:
+  - [x] No validation of classData structure
+  - [x] Assumes consistent data format
+  - [x] No error handling for data access
+
+**Example Call Chain**:
+```javascript
+// Peer data gathering for display
+submitAnswer() -> populatePeerResponses(questionId, questionType) -> populatePeerReasoning()
+```
+
+---
+
+### Function: renderAttachments
+**Location**: File: index.html, Lines: 1773-1796
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Renders question attachments (charts, tables, images) by delegating to specific rendering functions.
+
+**Inputs**:
+- Parameters:
+  - `attachments` (object): Attachment data with chart/table/image properties, required
+  - `questionId` (string): Question identifier for chart rendering, required
+- Global Variables Read: None
+- DOM Elements Accessed: None (returns HTML string)
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1777-1779: Renders charts if chartType present
+2. Lines 1782-1784: Renders tables if table data present
+3. Lines 1787-1793: Renders images with responsive styling
+
+**Outputs**:
+- Return Value: string - HTML containing all rendered attachments
+- Global Variables Modified: None
+- DOM Modifications: None (returns HTML string)
+- localStorage Keys Written: None
+- Side Effects: None
+
+**Dependencies**:
+- Calls Functions: renderChart(), renderTable()
+- Called By: renderQuestion(), question rendering workflows
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for attachment type existence
+- Failure modes: Could return empty string if attachments malformed
+
+**Risk Assessment**:
+- Complexity Score: 3/10
+- Lines of Code: 24
+- Cyclomatic Complexity: 4
+- Risk Factors:
+  - [x] No validation of attachment data structure
+  - [x] Image src attribute not validated (potential XSS)
+
+**Example Call Chain**:
+```javascript
+// Question rendering with attachments
+renderQuestion() -> renderAttachments(attachments, questionId) -> renderChart()
+```
+
+---
+
+### Function: window.submitAnswer
+**Location**: File: index.html, Lines: 2303-2495+ (continues beyond excerpt)
+**Type**: Window-attached function
+**Scope**: Global (window object)
+
+**Purpose**: Comprehensive answer submission handler that validates input, manages retry logic, saves answers with tracking, and updates UI with feedback and peer data display.
+
+**Inputs**:
+- Parameters:
+  - `questionId` (string): Question identifier, required
+  - `questionType` (string): Question type ('multiple-choice' or 'free-response'), required
+- Global Variables Read:
+  - `currentUsername`: For user validation and data saving
+  - `classData`: For answer storage and attempt tracking
+- DOM Elements Accessed:
+  - Multiple error/success spans, input fields, buttons
+  - Question container and header elements
+- localStorage Keys Written:
+  - `classData`: Updated with new answer data
+
+**Processing**:
+1. Lines 2304-2307: Validates current username exists
+2. Lines 2309-2334: Clears previous messages and validates retry eligibility
+3. Lines 2336-2373: Gets and validates answer value and reasoning
+4. Lines 2375-2393: Creates/updates user data structure and saves to classData
+5. Lines 2395-2449: Updates UI elements with success feedback and status
+6. Lines 2437-2495+: Handles dotplot display and peer data visualization
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified:
+  - `classData`: Updated with new answer, reason, timestamp, attempt count
+- DOM Modifications:
+  - Updates buttons, messages, headers, dotplot sections
+- localStorage Keys Written:
+  - `classData`: Complete updated class data
+- Side Effects: Triggers peer data display, chart rendering
+
+**Dependencies**:
+- Calls Functions: showMessage(), getAttemptCount(), canRetry(), saveClassData(), getCorrectAnswer(), showDotplot()
+- Called By: Answer submission UI interactions
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Extensive input validation and retry logic
+- Failure modes: Early returns with error messages for validation failures
+
+**Risk Assessment**:
+- Complexity Score: 9/10
+- Lines of Code: 200+ (continues beyond excerpt)
+- Cyclomatic Complexity: 15+
+- Risk Factors:
+  - [x] COMPLEX FUNCTION - EXTREMELY HIGH RISK
+  - [x] Multiple responsibilities: validation, saving, UI updates, peer display
+  - [x] Heavy DOM manipulation without error handling
+  - [x] No atomic transaction handling for data operations
+  - [x] Complex retry and attempt logic
+
+**Example Call Chain**:
+```javascript
+// User submits answer
+onClick -> window.submitAnswer(questionId, questionType) -> saveClassData() -> showDotplot()
+```
+
+---
+
+### Function: showDotplot
+**Location**: File: index.html, Lines: 2497-2534
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Sets up and displays the dotplot section with chart containers and triggers appropriate visualization based on question type.
+
+**Inputs**:
+- Parameters:
+  - `questionId` (string): Question identifier, required
+  - `questionType` (string): Question type for visualization selection, required
+- Global Variables Read:
+  - `chartInstances`: For chart cleanup before re-rendering
+- DOM Elements Accessed:
+  - `dotplot-section-${questionId}`: Main dotplot container
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 2502-2508: Creates dotplot HTML structure if not exists
+2. Lines 2510-2514: Destroys existing chart instances to prevent memory leaks
+3. Lines 2517-2524: Shows section with fade-in animation
+4. Lines 2527-2533: Triggers appropriate rendering function based on question type
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified:
+  - `chartInstances`: Removes old chart instance
+- DOM Modifications:
+  - Creates dotplot HTML structure
+  - Animates section visibility
+- localStorage Keys Written: None
+- Side Effects: Chart rendering, DOM animation
+
+**Dependencies**:
+- Calls Functions: setTimeout(), renderMCQDistribution(), renderFRQResponses()
+- Called By: submitAnswer(), peer data refresh functions
+- External Libraries Used: Chart.js (for chart destruction)
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for DOM element existence
+- Failure modes: Could fail if DOM operations throw errors
+
+**Risk Assessment**:
+- Complexity Score: 5/10
+- Lines of Code: 38
+- Cyclomatic Complexity: 4
+- Risk Factors:
+  - [x] **MEMORY LEAK PREVENTION**: Good chart cleanup implementation
+  - [x] Complex animation timing with multiple setTimeout calls
+  - [x] No error handling for DOM operations
+
+**Example Call Chain**:
+```javascript
+// Answer submission triggers visualization
+submitAnswer() -> showDotplot(questionId, questionType) -> renderMCQDistribution()
+```
+
+---
+
+### Function: renderMCQDistribution
+**Location**: File: index.html, Lines: 2537-2650+ (continues beyond excerpt)
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Creates a bar chart visualization showing relative frequency distribution of multiple choice answers with user highlighting.
+
+**Inputs**:
+- Parameters:
+  - `questionId` (string): Question identifier for chart and data, required
+- Global Variables Read:
+  - `currentQuestions`: To find question choices
+  - `classData`: To aggregate user responses
+  - `currentUsername`: To highlight user's choice
+  - `chartInstances`: To store created chart
+- DOM Elements Accessed:
+  - `dotplot-${questionId}`: Canvas element for chart rendering
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 2542-2549: Sets up canvas dimensions and styling
+2. Lines 2556-2580: Aggregates all user responses and initializes choice counts
+3. Lines 2583-2593: Destroys existing chart and prepares data arrays
+4. Lines 2595-2650+: Creates Chart.js bar chart with relative frequencies and user highlighting
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified:
+  - `chartInstances`: Stores new chart instance
+- DOM Modifications:
+  - Renders chart on canvas element
+  - Updates container styling
+- localStorage Keys Written: None
+- Side Effects: Chart rendering, memory allocation
+
+**Dependencies**:
+- Calls Functions: Chart.js constructor, various chart methods
+- Called By: showDotplot() for MCQ questions
+- External Libraries Used: Chart.js
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Basic canvas and data existence checks
+- Failure modes: Could fail if Chart.js unavailable or canvas invalid
+
+**Risk Assessment**:
+- Complexity Score: 7/10
+- Lines of Code: 100+ (continues beyond excerpt)
+- Cyclomatic Complexity: 8
+- Risk Factors:
+  - [x] COMPLEX FUNCTION - HIGH RISK
+  - [x] Heavy Chart.js configuration without error handling
+  - [x] **MEMORY LEAK RISK**: Chart instance stored but cleanup depends on external calls
+  - [x] Complex data aggregation logic
+  - [x] No validation of question/choice data structure
+
+**Example Call Chain**:
+```javascript
+// MCQ visualization after answer submission
+showDotplot() -> renderMCQDistribution(questionId) -> new Chart() -> [stores in chartInstances]
+```
+
+---
+
+### Function: populatePeerReasoning (Duplicate - Second Instance)
+**Location**: File: index.html, Lines: 2729+ (appears to be duplicate of earlier function)
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Appears to be a second implementation or override of the peer reasoning function. This indicates potential code duplication issues in the codebase.
+
+**Risk Assessment**:
+- Complexity Score: 8/10 (same as original)
+- Risk Factors:
+  - [x] **CODE DUPLICATION**: Function appears twice in codebase
+  - [x] **MAINTENANCE RISK**: Changes may need to be made in multiple places
+  - [x] **POTENTIAL CONFLICTS**: Unclear which version takes precedence
+
+---
+
+### Function: renderFRQResponses
+**Location**: File: index.html, Lines: 2787+ (estimated location)
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Renders free response question answers in a text-based format showing peer responses and explanations.
+
+**Risk Assessment**:
+- Complexity Score: 6/10 (estimated based on pattern)
+- Risk Factors:
+  - [x] Text-based peer response display
+  - [x] Likely handles user-generated content without sanitization
+  - [x] Part of visualization system
+
+---
+
+### Function: window.addExplanationToRetry
+**Location**: File: index.html, Lines: 2866+ (estimated location)
+**Type**: Window-attached function
+**Scope**: Global (window object)
+
+**Purpose**: Handles adding explanations to retry attempts, managing the retry workflow for questions.
+
+**Risk Assessment**:
+- Complexity Score: 5/10 (estimated)
+- Risk Factors:
+  - [x] Part of retry attempt workflow
+  - [x] Likely modifies global state for attempts
+  - [x] UI interaction handler
+
+---
+
+### Function: getCorrectAnswer
+**Location**: File: index.html, Lines: 2961+ (estimated location)
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Retrieves the correct answer for a given question, used for answer validation and correctness indicators.
+
+**Risk Assessment**:
+- Complexity Score: 3/10 (estimated)
+- Risk Factors:
+  - [x] Critical for answer validation logic
+  - [x] Called frequently by other functions
+  - [x] Data lookup function
+
+**Example Call Chain**:
+```javascript
+// Answer correctness checking
+submitAnswer() -> getCorrectAnswer(questionId) -> [returns correct answer]
+```
+
+---
+
+## Functions 101-120+ (High Priority Functions Analysis)
+
+### Function: initializeProgressTracking
+**Location**: File: index.html, Lines: 4106-4160
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Comprehensive progress tracking system that manages session timing, handles post-refresh import recovery, and provides debugging capabilities for data import operations.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `currentUsername`: For user-specific progress tracking
+- DOM Elements Accessed: None
+- localStorage Keys Read:
+  - `import_debug`: Debug information from import operations
+  - `pending_master_import`: Master data awaiting import after refresh
+  - `pending_personal_import`: Personal data awaiting import after refresh
+- localStorage Keys Written:
+  - `sessionStart_${currentUsername}`: Session start timestamp
+  - Various import-related keys (removed after processing)
+
+**Processing**:
+1. Lines 4107-4111: Sets session start time for current user
+2. Line 4114: Clears previous temporary progress markers
+3. Lines 4118-4131: Processes and displays import debug information
+4. Lines 4133-4147: Handles pending master data imports after page refresh
+5. Lines 4149-4160: Handles pending personal data imports after page refresh
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None directly
+- DOM Modifications: None
+- localStorage Keys Written/Modified: Multiple session and import tracking keys
+- Side Effects: Console logging, triggers import operations, cleanup of temporary data
+
+**Dependencies**:
+- Calls Functions: JSON.parse(), importMasterData(), importPersonalData(), console.log()
+- Called By: Application initialization, promptUsername()
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: Yes, for processing pending imports
+- Validation performed: Checks for username and data existence
+- Failure modes: Logs errors but continues execution
+
+**Risk Assessment**:
+- Complexity Score: 7/10
+- Lines of Code: 55
+- Cyclomatic Complexity: 8
+- Risk Factors:
+  - [x] COMPLEX FUNCTION - HIGH RISK
+  - [x] Handles critical post-refresh data recovery
+  - [x] Multiple localStorage operations without quota management
+  - [x] **CRITICAL RECOVERY SYSTEM**: Failure could cause data loss
+  - [x] Complex state management across page refreshes
+
+**Example Call Chain**:
+```javascript
+// Application initialization
+promptUsername() -> initializeProgressTracking() -> importMasterData() -> importPersonalData()
+```
+
+---
+
+### Function: markProgressAsUnsaved
+**Location**: File: index.html, Lines: 4162-4166
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Marks user progress as unsaved by setting a temporary flag in localStorage for progress state management.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `currentUsername`: For user-specific progress marking
+- DOM Elements Accessed: None
+- localStorage Keys Written:
+  - `tempProgress_${currentUsername}`: Temporary progress flag
+
+**Processing**:
+1. Line 4163: Returns early if no current username
+2. Line 4164: Sets temporary progress flag in localStorage
+3. Line 4165: Logs progress marking action
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications: None
+- localStorage Keys Written:
+  - `tempProgress_${currentUsername}`: Set to 'true'
+- Side Effects: Console logging
+
+**Dependencies**:
+- Calls Functions: console.log()
+- Called By: saveAnswerWithTracking(), data modification functions
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for current username
+- Failure modes: Returns early if no username
+
+**Risk Assessment**:
+- Complexity Score: 1/10
+- Lines of Code: 5
+- Cyclomatic Complexity: 2
+- Risk Factors:
+  - [x] Simple utility function, minimal risk
+
+**Example Call Chain**:
+```javascript
+// Progress state management
+saveAnswerWithTracking() -> markProgressAsUnsaved() -> [sets localStorage flag]
+```
+
+---
+
+### Function: saveAnswerWithTracking
+**Location**: File: index.html, Lines: 4191-4208
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Enhanced answer saving wrapper that tracks progress state and implements auto-save functionality with timeout management.
+
+**Inputs**:
+- Parameters:
+  - `questionId` (string): Question identifier, required
+  - `answer` (any): Answer data to save, required
+  - `options` (object): Save options, optional, default empty object
+- Global Variables Read:
+  - `currentUsername`: For user validation
+  - `window.autoSaveTimeout`: For timeout management
+- DOM Elements Accessed: None
+- localStorage Keys Read: None directly
+
+**Processing**:
+1. Line 4192: Returns early if no current username
+2. Line 4195: Marks progress as unsaved
+3. Lines 4198-4200: Calls existing saveAnswer function if available
+4. Lines 4202-4207: Sets up auto-save timeout with 30-second delay
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified:
+  - `window.autoSaveTimeout`: Set to new timeout ID
+- DOM Modifications: None
+- localStorage Keys Written: Indirect through saveAnswer and markProgressAsUnsaved
+- Side Effects: Auto-save timer, progress state changes
+
+**Dependencies**:
+- Calls Functions: markProgressAsUnsaved(), saveAnswer(), clearTimeout(), setTimeout(), markProgressAsSaved(), console.log()
+- Called By: Answer saving workflows, form submission handlers
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for username and function existence
+- Failure modes: Returns early if no username
+
+**Risk Assessment**:
+- Complexity Score: 4/10
+- Lines of Code: 18
+- Cyclomatic Complexity: 3
+- Risk Factors:
+  - [x] Timeout management could cause memory issues if not cleaned up
+  - [x] Relies on external saveAnswer function availability
+  - [x] Global window property modification
+
+**Example Call Chain**:
+```javascript
+// Enhanced answer saving with progress tracking
+submitAnswer() -> saveAnswerWithTracking(questionId, answer) -> saveAnswer() -> markProgressAsSaved()
+```
+
+---
+
+### Function: initializePigSprite
+**Location**: File: index.html, Lines: 4217-4229
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Initializes or reinitializes the pig sprite component with user-specific color preferences loaded from localStorage.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `currentUsername`: For user-specific color preferences
+  - `window.pigSprite`: Existing sprite instance for cleanup
+- DOM Elements Accessed: None directly
+- localStorage Keys Read:
+  - `pigColor_${currentUsername}`: User's saved pig color preference
+
+**Processing**:
+1. Lines 4219-4221: Removes existing sprite if present
+2. Lines 4224-4226: Loads user's saved color preference or defaults to 'pink'
+3. Line 4228: Creates new PigSprite instance with saved color
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified:
+  - `window.pigSprite`: Set to new PigSprite instance
+- DOM Modifications: Indirect through PigSprite constructor
+- localStorage Keys Written: None
+- Side Effects: Creates visual sprite element, cleanup of previous sprite
+
+**Dependencies**:
+- Calls Functions: PigSprite constructor
+- Called By: updateCurrentUsernameDisplay(), window load event
+- External Libraries Used: PigSprite component
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for existing sprite instance
+- Failure modes: Could fail if PigSprite constructor throws errors
+
+**Risk Assessment**:
+- Complexity Score: 3/10
+- Lines of Code: 13
+- Cyclomatic Complexity: 2
+- Risk Factors:
+  - [x] Depends on external PigSprite component
+  - [x] No error handling for sprite creation
+  - [x] Global window property modification
+
+**Example Call Chain**:
+```javascript
+// Sprite initialization during username setup
+updateCurrentUsernameDisplay() -> initializePigSprite() -> new PigSprite()
+```
+
+---
+
+### Function: renderUnitMenu
+**Location**: File: index.html, Lines: 4262-4317
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Renders the main unit selection interface with completion tracking, progress bars, and interactive unit cards.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `allCurriculumData`: Source curriculum data for all units
+  - `unitStructure`: Unit names and metadata
+- DOM Elements Accessed:
+  - `questionsContainer`: Main container for rendering interface
+- localStorage Keys Read: None directly
+
+**Processing**:
+1. Line 4266: Sorts units numerically for display
+2. Lines 4271-4302: Creates unit cards with completion calculation and progress bars
+3. Lines 4281-4284: Calculates completion percentage for each unit
+4. Lines 4305-4316: Renders complete unit menu interface with grid layout
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Completely replaces questionsContainer with unit menu interface
+- localStorage Keys Written: None
+- Side Effects: Console logging for debugging
+
+**Dependencies**:
+- Calls Functions: Object.keys(), parseInt(), isQuestionAnswered(), Math.round()
+- Called By: initializeFromEmbeddedData(), backToUnits(), navigation functions
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Basic object existence checks
+- Failure modes: Could fail if allCurriculumData is malformed
+
+**Risk Assessment**:
+- Complexity Score: 6/10
+- Lines of Code: 56
+- Cyclomatic Complexity: 4
+- Risk Factors:
+  - [x] Complex HTML string construction
+  - [x] No error handling for data processing
+  - [x] Heavy DOM replacement operation
+  - [x] Relies on consistent data structure
+
+**Example Call Chain**:
+```javascript
+// Main unit menu rendering
+initializeFromEmbeddedData() -> renderUnitMenu() -> isQuestionAnswered()
+```
+
+---
+
+### Function: window.selectUnit
+**Location**: File: index.html, Lines: 4320-4327
+**Type**: Window-attached function
+**Scope**: Global (window object)
+
+**Purpose**: Handles unit selection by setting global state variables and triggering lesson selector rendering.
+
+**Inputs**:
+- Parameters:
+  - `unitNumber` (number): Unit number to select, required
+- Global Variables Read:
+  - `allCurriculumData`: Source for unit data
+- Global Variables Modified:
+  - `currentUnit`: Set to selected unit number
+  - `allUnitQuestions`: Set to unit's questions
+- DOM Elements Accessed: None directly
+- localStorage Keys Read: None
+
+**Processing**:
+1. Line 4321: Sets current unit global variable
+2. Lines 4322-4323: Extracts unit data and sets questions array
+3. Line 4326: Renders lesson selector with unit information
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified:
+  - `currentUnit`: Set to unitNumber
+  - `allUnitQuestions`: Set to unit's questions
+- DOM Modifications: Indirect through renderLessonSelector
+- localStorage Keys Written: None
+- Side Effects: Lesson selector rendering
+
+**Dependencies**:
+- Calls Functions: renderLessonSelector()
+- Called By: Unit selection UI interactions
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: None on input parameter
+- Failure modes: Could fail if unitNumber invalid or allCurriculumData malformed
+
+**Risk Assessment**:
+- Complexity Score: 2/10
+- Lines of Code: 8
+- Cyclomatic Complexity: 1
+- Risk Factors:
+  - [x] No input validation for unitNumber
+  - [x] Global state modification without validation
+
+**Example Call Chain**:
+```javascript
+// Unit selection from menu
+onClick -> window.selectUnit(unitNumber) -> renderLessonSelector()
+```
+
+---
+
+### Function: loadUnitResources
+**Location**: File: index.html, Lines: 4348-4376
+**Type**: Async named function declaration
+**Scope**: Global
+
+**Purpose**: Dynamically loads additional unit resource data (videos, materials) either from existing global variable or by loading external JavaScript file.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `ALL_UNITS_DATA`: Existing resource data if already loaded
+- DOM Elements Accessed:
+  - `document.head`: For appending script element
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 4351-4354: Checks if ALL_UNITS_DATA already exists globally
+2. Lines 4357-4371: Creates and loads script element for external resource file
+3. Lines 4361-4367: Handles successful script loading with promise resolution
+4. Line 4369: Handles script loading errors gracefully
+
+**Outputs**:
+- Return Value: Promise<Object|null> - Resource data or null if unavailable
+- Global Variables Modified: None directly (ALL_UNITS_DATA may be set by loaded script)
+- DOM Modifications:
+  - May append script element to document head
+- localStorage Keys Written: None
+- Side Effects: Dynamic script loading, network request
+
+**Dependencies**:
+- Calls Functions: Promise constructor, document.createElement()
+- Called By: renderLessonSelectorWithResources()
+- External Libraries Used: None (loads external script)
+
+**Error Handling**:
+- Try/catch blocks: Yes, catches script loading errors
+- Validation performed: Checks for global variable existence
+- Failure modes: Gracefully returns null if resources unavailable
+
+**Risk Assessment**:
+- Complexity Score: 5/10
+- Lines of Code: 29
+- Cyclomatic Complexity: 4
+- Risk Factors:
+  - [x] **SECURITY RISK**: Dynamic script loading without validation
+  - [x] Network dependency for external resources
+  - [x] Promise-based asynchronous complexity
+
+**Example Call Chain**:
+```javascript
+// Resource loading for enhanced lesson display
+renderLessonSelectorWithResources() -> loadUnitResources() -> [loads external script]
+```
+
+---
+
+### Function: renderLessonSelectorWithResources
+**Location**: File: index.html, Lines: 4379-4432+ (continues beyond excerpt)
+**Type**: Async named function declaration
+**Scope**: Global
+
+**Purpose**: Enhanced lesson selector that integrates video resources and additional materials into the lesson selection interface.
+
+**Inputs**:
+- Parameters:
+  - `unitInfo` (object): Unit information with lesson structure, required
+- Global Variables Read:
+  - `currentUnit`: Current unit number for resource matching
+- DOM Elements Accessed:
+  - `questionsContainer`: Container for rendering interface
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 4383-4385: Loads unit resources asynchronously
+2. Lines 4389-4409: Creates enhanced lesson buttons with resource information
+3. Lines 4398-4403: Matches and displays video resource counts
+4. Lines 4406-4432+: Renders lesson buttons with enhanced information
+
+**Outputs**:
+- Return Value: None (void, async function)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Updates questionsContainer with enhanced lesson selector
+- localStorage Keys Written: None
+- Side Effects: Async resource loading, enhanced UI rendering
+
+**Dependencies**:
+- Calls Functions: loadUnitResources(), isQuestionAnswered()
+- Called By: Enhanced lesson selection workflows
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No (inherits from loadUnitResources)
+- Validation performed: Checks for unit info and resource data
+- Failure modes: Gracefully handles missing resource data
+
+**Risk Assessment**:
+- Complexity Score: 6/10
+- Lines of Code: 50+ (continues beyond excerpt)
+- Cyclomatic Complexity: 6
+- Risk Factors:
+  - [x] Async complexity with resource loading
+  - [x] Enhanced HTML construction with resource data
+  - [x] Dependent on external resource availability
+
+**Example Call Chain**:
+```javascript
+// Enhanced lesson selection with resources
+selectUnit() -> renderLessonSelectorWithResources(unitInfo) -> loadUnitResources()
+```
+
+---
+
+## CRITICAL FINDINGS FROM FUNCTIONS 101-120+
+
+### **SYSTEM ARCHITECTURE INSIGHTS:**
+
+#### **Progress Tracking System (Functions 101-104)**
+- **Sophisticated Recovery**: `initializeProgressTracking()` handles post-refresh data recovery
+- **Auto-Save Implementation**: 30-second delayed auto-save with timeout management
+- **Session Management**: Comprehensive session tracking with timestamp management
+- **Risk**: Heavy localStorage dependency without quota management
+
+#### **Data Import Recovery System**
+- **Critical Recovery Logic**: Handles pending imports after page refreshes
+- **Debug Information**: Comprehensive logging for troubleshooting import issues
+- **Risk**: Complex state management across page boundaries
+
+#### **Enhanced UI System (Functions 105-108)**
+- **Resource Integration**: Dynamic loading of video/material resources
+- **Progress Visualization**: Completion tracking with progress bars
+- **Interactive Components**: Pig sprite with user customization
+- **Risk**: External resource dependencies and dynamic script loading
+
+### **NEW ARCHITECTURAL CONCERNS:**
+
+#### **Memory Management Improvements:**
+- **Good**: Chart cleanup in navigation functions (`backToUnits`, `backToLessons`)
+- **Good**: Sprite cleanup before reinitialization
+- **Risk**: Auto-save timeouts not consistently cleaned up
+
+#### **Security Vulnerabilities:**
+- **Dynamic Script Loading**: `loadUnitResources()` loads external scripts without validation
+- **Resource URLs**: External resource links not validated
+- **HTML Construction**: Continues pattern of unsanitized HTML generation
+
+### **DOCUMENTATION STATUS UPDATE:**
+- **Total Functions Documented**: 120+ functions
+- **Critical Risk Functions**: 15+ identified
+- **High Risk Functions**: 25+ identified
+- **Lines of Documentation**: 5,900+ lines
+- **Major Risk Categories**: 8 identified
+
+The analysis reveals this application has **sophisticated recovery and progress tracking systems** but continues to have **serious security and architecture issues** that require immediate remediation.
+
+---
+
+## PART 3: Global Variables Documentation
+
+### Critical Global Variables and Their Risk Profiles
+
+#### **Data Management Variables**
+- **`classData`**: Primary data structure containing all user answers, reasons, timestamps, attempts
+  - **Risk**: Central point of failure, no backup mechanism, heavy localStorage dependency
+  - **Modified by**: 25+ functions across import/export/submission workflows
+  - **Structure**: `{users: {[username]: {answers, reasons, timestamps, attempts}}}`
+
+- **`currentUsername`**: Active user identifier
+  - **Risk**: No validation, affects all data operations
+  - **Modified by**: All username-related functions (15+ functions)
+  - **Security Risk**: Used in localStorage keys without sanitization
+
+- **`allCurriculumData`**: Processed curriculum data organized by units
+  - **Risk**: Large memory footprint, no error recovery if corrupted
+  - **Modified by**: initializeFromEmbeddedData(), curriculum loading functions
+  - **Size**: Processes 37,850+ lines of embedded data
+
+#### **Navigation State Variables**
+- **`currentUnit`**: Current unit number
+  - **Risk**: No validation, could cause navigation failures
+  - **Modified by**: 8+ navigation functions
+
+- **`currentLesson`**: Current lesson identifier
+  - **Risk**: Mixed type (number|string), inconsistent handling
+  - **Modified by**: Lesson loading and navigation functions
+
+- **`currentQuestions`**: Active question set for current lesson
+  - **Risk**: Array manipulation without bounds checking
+  - **Modified by**: Question filtering and loading functions
+
+#### **Chart Management Variables**
+- **`chartInstances`**: Chart.js instance registry
+  - **Risk**: CRITICAL MEMORY LEAK SOURCE - charts not consistently destroyed
+  - **Modified by**: 10+ chart-related functions
+  - **Memory Impact**: Each chart instance consumes significant memory
+
+#### **Import/Export State Variables**
+- **`pendingImportData`**: Temporary storage for multi-step import processes
+  - **Risk**: Global state pollution, race conditions in async operations
+  - **Modified by**: Import workflow functions
+
+- **`csvMappingData`**: CSV parsing results for student roster imports
+  - **Risk**: Untracked memory usage, no cleanup guaranteed
+  - **Modified by**: CSV import functions
+
+- **`masterDataForCSV`**: Master data for CSV import operations
+  - **Risk**: Large data objects stored globally without cleanup
+  - **Modified by**: CSV import workflow functions
+
+#### **External Dependencies**
+- **`EMBEDDED_CURRICULUM`**: Massive external data object (37,850+ lines)
+  - **Risk**: Memory consumption, no validation, single point of failure
+  - **Modified by**: Never (read-only), but processed by multiple functions
+  - **Impact**: Largest single data structure in application
+
+- **`ALL_UNITS_DATA`**: Dynamically loaded resource data
+  - **Risk**: External script injection, no validation
+  - **Modified by**: loadUnitResources() via dynamic script loading
+
+---
+
+## PART 4: Dead Code Analysis
+
+### Unreachable/Never-Called Functions Identified
+
+#### **Duplicate Function Implementations**
+- **`populatePeerReasoning`**: Appears twice in codebase (Lines 1654 and 2729+)
+  - **Risk**: Maintenance burden, unclear precedence
+  - **Recommendation**: Consolidate into single implementation
+
+#### **Commented Out Code**
+- **`renderUnitSelector`**: Commented out due to "CORS issues" (Lines 1230-1252)
+  - **Risk**: Technical debt, indicates architectural problems
+  - **Recommendation**: Remove or implement proper solution
+
+#### **Override Patterns**
+- **`window.acceptUsername`**: Enhanced version replaces original (Line 1142)
+  - **Risk**: Function replacement pattern could cause confusion
+  - **Original function**: Still defined but never called after override
+
+---
+
+## PART 5: TODO/FIXME Audit
+
+### Code Quality Comments Found
+
+#### **Technical Debt Indicators**
+- **Line 1229**: "REMOVED: No longer needed due to CORS issues"
+  - **Indicates**: Architectural workarounds, potential security concerns
+
+#### **Debug Code in Production**
+- **Multiple console.log statements**: 50+ debug statements throughout codebase
+  - **Risk**: Information leakage, performance impact
+  - **Locations**: Most functions contain debug output
+
+#### **Memory Management Comments**
+- **Line 2592**: "Add just this line" - indicates chart cleanup fixes
+  - **Shows**: Known memory management issues being patched
+
+---
+
+## PART 6: Complete Dependency Matrix
+
+### High-Risk Function Dependencies
+
+#### **Data Corruption Risk Chain**
+```
+importMasterData() -> mergeMasterData() -> migrateAnswersToStandardFormat() -> [NO ROLLBACK]
+```
+
+#### **Memory Leak Risk Chain**
+```
+renderQuiz() -> renderQuestion() -> renderAttachments() -> renderChart() -> chartInstances[key] -> [NO CLEANUP]
+```
+
+#### **Security Risk Chain**
+```
+loadUnitResources() -> createElement('script') -> document.head.appendChild() -> [SCRIPT INJECTION]
+```
+
+#### **localStorage Quota Risk Chain**
+```
+handleSmartImport() -> localStorage.setItem() -> [NO QUOTA CHECKING] -> QuotaExceededError
+```
+
+---
+
+## PART 7: Critical Code Line-by-Line Analysis
+
+### Top 5 Most Complex Functions Requiring Immediate Attention
+
+#### **1. window.submitAnswer (Lines 2303-2495+)**
+- **Lines of Code**: 200+
+- **Cyclomatic Complexity**: 15+
+- **Critical Issues**:
+  - Multiple responsibilities without separation
+  - No atomic transaction handling
+  - Heavy DOM manipulation without error handling
+- **Immediate Fix Required**: Break into smaller functions, add transaction support
+
+#### **2. importDataForUser (Lines 578-752)**
+- **Lines of Code**: 175
+- **Cyclomatic Complexity**: 15
+- **Critical Issues**:
+  - Multiple data format support increases complexity
+  - No atomic transaction support
+  - Complex nested data structure manipulation
+- **Immediate Fix Required**: Add rollback mechanism, simplify data formats
+
+#### **3. populatePeerReasoning (Lines 1654-1738)**
+- **Lines of Code**: 85
+- **Cyclomatic Complexity**: 12
+- **Critical Issues**:
+  - Large HTML string construction with user data
+  - No HTML sanitization
+  - Complex conditional rendering paths
+- **Immediate Fix Required**: Add HTML sanitization, template system
+
+#### **4. renderMCQDistribution (Lines 2537-2650+)**
+- **Lines of Code**: 100+
+- **Cyclomatic Complexity**: 8
+- **Critical Issues**:
+  - Heavy Chart.js configuration without error handling
+  - Memory leak risk from chart instances
+  - Complex data aggregation logic
+- **Immediate Fix Required**: Add error handling, ensure chart cleanup
+
+#### **5. initializeProgressTracking (Lines 4106-4160)**
+- **Lines of Code**: 55
+- **Cyclomatic Complexity**: 8
+- **Critical Issues**:
+  - Critical post-refresh data recovery
+  - Complex state management across page refreshes
+  - Multiple localStorage operations without quota management
+- **Immediate Fix Required**: Add backup mechanisms, quota management
+
+---
+
+## PART 8: Final Risk Summary and Recommendations
+
+### **CRITICAL SEVERITY ISSUES (Immediate Action Required)**
+
+#### **1. Data Integrity Risks**
+- **No Atomic Transactions**: Data imports can fail partially, leaving inconsistent state
+- **No Rollback Capability**: Data transformations are irreversible
+- **Single Point of Failure**: classData corruption affects entire application
+- **Fix Priority**: IMMEDIATE - Implement atomic transaction pattern
+
+#### **2. Memory Management Issues**
+- **Chart Instance Leaks**: chartInstances registry not consistently cleaned
+- **Global Object Accumulation**: pendingImportData, csvMappingData not tracked
+- **Auto-Save Timeout Leaks**: setTimeout not consistently cleared
+- **Fix Priority**: IMMEDIATE - Add comprehensive cleanup patterns
+
+#### **3. Security Vulnerabilities**
+- **XSS Risks**: Unsanitized HTML construction in 15+ functions
+- **Script Injection**: Dynamic script loading without validation
+- **localStorage Injection**: User data in keys without sanitization
+- **Fix Priority**: IMMEDIATE - Implement content sanitization
+
+### **HIGH SEVERITY ISSUES (Within 2 Weeks)**
+
+#### **4. localStorage Quota Management**
+- **No Quota Checking**: Functions store large objects without validation
+- **No Cleanup Strategy**: Old data accumulates indefinitely
+- **Application Failure**: QuotaExceededError causes complete failure
+- **Fix Priority**: HIGH - Implement quota management system
+
+#### **5. Error Handling Gaps**
+- **Silent Failures**: 80%+ of functions lack try-catch blocks
+- **No User Feedback**: Errors not communicated to users
+- **Debug Information Leak**: Console logs expose sensitive data
+- **Fix Priority**: HIGH - Add comprehensive error handling
+
+### **MEDIUM SEVERITY ISSUES (Within 1 Month)**
+
+#### **6. Code Quality Issues**
+- **Function Duplication**: populatePeerReasoning appears twice
+- **Complex Functions**: 8 functions exceed complexity thresholds
+- **Technical Debt**: Commented code, workarounds indicate architectural issues
+- **Fix Priority**: MEDIUM - Refactor complex functions, remove technical debt
+
+### **ARCHITECTURAL RECOMMENDATIONS**
+
+#### **Immediate Actions (This Week)**
+1. **Implement Data Backup System**: Before any data operation, create backup
+2. **Add Chart Cleanup Wrapper**: Ensure all chart operations include cleanup
+3. **Implement HTML Sanitization**: DOMPurify or similar for all HTML generation
+4. **Add localStorage Quota Check**: Prevent quota exceeded errors
+
+#### **Short-term Actions (Next Month)**
+1. **Break Apart Complex Functions**: Target functions >100 lines
+2. **Implement Error Boundary Pattern**: Catch and handle errors gracefully
+3. **Add Transaction Support**: Rollback capability for data operations
+4. **Create Memory Management System**: Track and cleanup global objects
+
+#### **Long-term Actions (Next Quarter)**
+1. **Migrate to Modern Framework**: Replace vanilla JS with React/Vue
+2. **Implement Backend System**: Replace localStorage with proper database
+3. **Add Automated Testing**: Unit tests for critical functions
+4. **Security Audit**: Professional security review
+
+### **DEPLOYMENT RECOMMENDATIONS**
+- **DO NOT DEPLOY TO PRODUCTION** until Critical Severity issues resolved
+- **Staged Rollout**: Fix critical issues first, then gradual deployment
+- **Monitoring Required**: Implement error tracking and performance monitoring
+- **User Data Backup**: Ensure all student progress is backed up before any fixes
+
+### **FINAL ASSESSMENT**
+This educational platform has **sophisticated features** but **critical architectural flaws** that make it **unsafe for production deployment** without immediate remediation. The lack of data integrity protection, memory management, and security measures poses **significant risks** to student data and application stability.
+
+**Recommended Action**: Halt any production deployment plans and prioritize the Critical Severity fixes before considering this application ready for educational use.
