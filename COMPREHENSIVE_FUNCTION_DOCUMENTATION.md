@@ -4304,3 +4304,935 @@ The documentation reveals this application has **serious data integrity and memo
 - **Event handler replacement**: Memory leaks from uncleaned event bindings
 
 The analysis confirms this educational platform requires **immediate architectural remediation** before it can be safely deployed in production environments.
+
+---
+
+## Functions 56-70 (Continued Analysis)
+
+### Function: flashGreenScreen
+**Location**: File: index.html, Lines: 1044-1080
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Creates a visual feedback effect by flashing a translucent green overlay across the entire screen, used to indicate successful operations or positive feedback to users.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read: None
+- DOM Elements Accessed:
+  - `document.head`: For appending CSS animation styles
+  - `document.body`: For appending flash overlay element
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1045-1056: Creates flash overlay div with fixed positioning and green background
+2. Lines 1059-1070: Checks for existing CSS animation and creates it if needed
+3. Line 1069: Appends animation stylesheet to document head
+4. Line 1072: Appends flash element to document body
+5. Lines 1075-1079: Sets timeout to remove flash element after 300ms animation
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - May create and append CSS style element to head
+  - Creates and appends flash overlay element to body
+  - Removes flash element after animation
+- localStorage Keys Written: None
+- Side Effects: Visual screen flash animation, temporary DOM elements
+
+**Dependencies**:
+- Calls Functions: setTimeout(), DOM manipulation methods
+- Called By: Success feedback scenarios throughout application
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for existing animation style, checks for parent node before removal
+- Failure modes: Could fail if DOM manipulation throws errors
+
+**Risk Assessment**:
+- Complexity Score: 4/10
+- Lines of Code: 37
+- Cyclomatic Complexity: 3
+- Risk Factors:
+  - [x] Creates DOM elements without cleanup guarantee
+  - [x] Hardcoded z-index could conflict with other UI elements
+  - [x] No error handling for DOM operations
+  - [x] CSS injection through style element creation
+
+**Example Call Chain**:
+```javascript
+// Success feedback after data operation
+saveAnswerWithTracking() -> flashGreenScreen() -> [visual feedback]
+```
+
+---
+
+### Function: window.closeSyncModal
+**Location**: File: index.html, Lines: 1084-1089
+**Type**: Window-attached function
+**Scope**: Global (window object)
+
+**Purpose**: Closes the unified sync modal by finding and removing it from the DOM, providing cleanup for modal interactions.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read: None
+- DOM Elements Accessed:
+  - `unifiedSyncModal`: Modal element to be removed
+- localStorage Keys Read: None
+
+**Processing**:
+1. Line 1085: Attempts to find the unified sync modal by ID
+2. Lines 1086-1088: If modal exists, removes it from DOM
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Removes unifiedSyncModal element if it exists
+- localStorage Keys Written: None
+- Side Effects: Modal closure and cleanup
+
+**Dependencies**:
+- Calls Functions: None
+- Called By: Modal close button handlers, escape key handlers
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for modal existence before removal
+- Failure modes: Gracefully handles missing modal element
+
+**Risk Assessment**:
+- Complexity Score: 1/10
+- Lines of Code: 6
+- Cyclomatic Complexity: 2
+- Risk Factors:
+  - [x] No error handling for DOM operations
+
+**Example Call Chain**:
+```javascript
+// User closes sync modal
+onClick -> window.closeSyncModal() -> [modal cleanup]
+```
+
+---
+
+### Function: updateCurrentUsernameDisplay
+**Location**: File: index.html, Lines: 1094-1099
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Updates UI elements that display the current username and reinitializes the pig sprite with user's saved preferences.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read: None directly
+- DOM Elements Accessed: None directly
+- localStorage Keys Read: None directly
+
+**Processing**:
+1. Lines 1096-1098: Checks if initializePigSprite function exists and calls it
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None directly
+- DOM Modifications: Indirect through initializePigSprite function
+- localStorage Keys Written: None
+- Side Effects: May trigger pig sprite reinitialization with user preferences
+
+**Dependencies**:
+- Calls Functions: initializePigSprite() [conditional]
+- Called By: Username change events, acceptance functions
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks function existence with typeof
+- Failure modes: Gracefully handles missing initializePigSprite function
+
+**Risk Assessment**:
+- Complexity Score: 1/10
+- Lines of Code: 6
+- Cyclomatic Complexity: 2
+- Risk Factors:
+  - [x] Minimal functionality, limited risk
+
+**Example Call Chain**:
+```javascript
+// Username change triggers display update
+acceptUsername() -> updateCurrentUsernameDisplay() -> initializePigSprite()
+```
+
+---
+
+### Function: loadRecentUsernames
+**Location**: File: index.html, Lines: 1102-1137
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Scans localStorage for previously used usernames and displays them as quick-access buttons in the username selection interface.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read: None directly
+- DOM Elements Accessed:
+  - `recentUsernames`: Container element for recent usernames section
+  - `recentUsernamesList`: List element for username buttons
+- localStorage Keys Read:
+  - All keys starting with `answers_`: To extract usernames
+  - `classData`: To find additional usernames
+
+**Processing**:
+1. Lines 1106-1113: Iterates through all localStorage keys to find username-specific data
+2. Lines 1108-1111: Extracts usernames from `answers_` prefixed keys
+3. Lines 1116-1123: Checks class data for additional usernames
+4. Lines 1126-1136: If usernames found, displays them as clickable buttons
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Shows recent usernames container
+  - Populates list with username buttons
+- localStorage Keys Written: None
+- Side Effects: Creates interactive username selection buttons
+
+**Dependencies**:
+- Calls Functions: JSON.parse(), checkExistingData() [through onclick handlers]
+- Called By: showUsernamePrompt(), username interface functions
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for username existence and validity
+- Failure modes: Could fail if localStorage access throws errors or JSON parsing fails
+
+**Risk Assessment**:
+- Complexity Score: 5/10
+- Lines of Code: 36
+- Cyclomatic Complexity: 5
+- Risk Factors:
+  - [x] No error handling for localStorage operations
+  - [x] No error handling for JSON parsing
+  - [x] Dynamic HTML construction with user data (potential XSS)
+  - [x] Iterates through all localStorage keys (performance impact)
+
+**Example Call Chain**:
+```javascript
+// Username interface initialization
+showUsernamePrompt() -> loadRecentUsernames() -> [creates username buttons]
+```
+
+---
+
+### Function: window.acceptUsername (Enhanced version)
+**Location**: File: index.html, Lines: 1142-1154
+**Type**: Window-attached function (overwrites original)
+**Scope**: Global (window object)
+
+**Purpose**: Enhanced version of acceptUsername that maintains a recent usernames list in localStorage while delegating to the original acceptUsername functionality.
+
+**Inputs**:
+- Parameters:
+  - `name` (string): Username to accept, required
+- Global Variables Read: None directly
+- DOM Elements Accessed: None directly
+- localStorage Keys Read:
+  - `recentUsernames`: Array of recently used usernames
+- localStorage Keys Written:
+  - `recentUsernames`: Updated array with new username
+
+**Processing**:
+1. Lines 1144-1149: Loads recent usernames list and adds new username if not already present
+2. Line 1146: Adds username to beginning of list (most recent first)
+3. Lines 1147-1148: Limits list to 5 most recent usernames
+4. Line 1149: Saves updated list to localStorage
+5. Line 1153: Calls original acceptUsername function with all original functionality
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None directly
+- DOM Modifications: Indirect through original acceptUsername
+- localStorage Keys Written:
+  - `recentUsernames`: Updated username history
+- Side Effects: Maintains username history, triggers original acceptance flow
+
+**Dependencies**:
+- Calls Functions: JSON.parse(), JSON.stringify(), originalAcceptUsername()
+- Called By: All username acceptance mechanisms (replaces original)
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: None on username parameter
+- Failure modes: Could fail if localStorage operations throw errors
+
+**Risk Assessment**:
+- Complexity Score: 3/10
+- Lines of Code: 13
+- Cyclomatic Complexity: 2
+- Risk Factors:
+  - [x] No error handling for localStorage operations
+  - [x] Function replacement pattern could cause confusion
+  - [x] No validation of input parameter
+
+**Example Call Chain**:
+```javascript
+// Enhanced username acceptance with history tracking
+UI_click -> window.acceptUsername(name) -> [saves to history] -> originalAcceptUsername()
+```
+
+---
+
+### Function: window.exportUsername
+**Location**: File: index.html, Lines: 1157-1180
+**Type**: Window-attached function
+**Scope**: Global (window object)
+
+**Purpose**: Exports the current username as a simple JSON identity file for backup or transfer purposes.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `currentUsername`: Username to export
+- DOM Elements Accessed: Creates temporary anchor element for download
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1158-1161: Validates that current username exists
+2. Lines 1163-1167: Creates export data object with username and metadata
+3. Lines 1169-1177: Creates blob, download link, and triggers file download
+4. Line 1177: Cleans up object URL to prevent memory leaks
+5. Line 1179: Shows success message to user
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Temporarily creates and removes anchor element
+- localStorage Keys Written: None
+- Side Effects: Triggers file download, shows success message
+
+**Dependencies**:
+- Calls Functions: showMessage(), Blob(), URL.createObjectURL(), URL.revokeObjectURL()
+- Called By: Export functionality in UI
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for current username existence
+- Failure modes: Could fail if file operations throw errors
+
+**Risk Assessment**:
+- Complexity Score: 4/10
+- Lines of Code: 24
+- Cyclomatic Complexity: 2
+- Risk Factors:
+  - [x] No error handling for file operations
+  - [x] DOM manipulation without error handling
+  - [x] Object URL cleanup relies on manual management
+
+**Example Call Chain**:
+```javascript
+// User exports their username identity
+onClick -> window.exportUsername() -> [creates download] -> showMessage()
+```
+
+---
+
+### Function: showUsernameWelcome
+**Location**: File: index.html, Lines: 1182-1192
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Displays a welcome message with the current username at the top of the application interface.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `currentUsername`: Username to display in welcome message
+- DOM Elements Accessed:
+  - `.container`: Main container element
+  - `.username-welcome`: Existing welcome element (for removal)
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1183-1184: Finds main container element, returns early if not found
+2. Lines 1185-1186: Removes any existing welcome message
+3. Lines 1188-1191: Creates new welcome div with username and inserts at top
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Removes existing welcome message if present
+  - Creates and inserts new welcome message element
+- localStorage Keys Written: None
+- Side Effects: Updates UI with personalized welcome message
+
+**Dependencies**:
+- Calls Functions: None
+- Called By: Username acceptance flows, application initialization
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for container existence
+- Failure modes: Gracefully handles missing container element
+
+**Risk Assessment**:
+- Complexity Score: 2/10
+- Lines of Code: 11
+- Cyclomatic Complexity: 3
+- Risk Factors:
+  - [x] No error handling for DOM operations
+  - [x] Relies on specific DOM structure
+
+**Example Call Chain**:
+```javascript
+// Welcome message display after username acceptance
+acceptUsername() -> showUsernameWelcome() -> [displays welcome message]
+```
+
+---
+
+### Function: initializeFromEmbeddedData
+**Location**: File: index.html, Lines: 1194-1227
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Parses embedded curriculum data, organizes it by units and lessons, and initializes the unit menu interface.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `EMBEDDED_CURRICULUM`: Large embedded curriculum data object
+  - `allCurriculumData`: Set with organized curriculum data
+- DOM Elements Accessed: None directly
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1195-1197: Initializes curriculum data structure and extracts questions
+2. Lines 1200-1210: Groups questions by unit number using regex pattern matching
+3. Lines 1213-1223: Processes each unit by detecting lesson structure and storing organized data
+4. Line 1226: Renders the unit selection menu
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified:
+  - `allCurriculumData`: Set with organized curriculum data by unit
+- DOM Modifications: Indirect through renderUnitMenu()
+- localStorage Keys Written: None
+- Side Effects: Initializes application with curriculum data and renders unit menu
+
+**Dependencies**:
+- Calls Functions: detectUnitAndLessons(), renderUnitMenu()
+- Called By: promptUsername(), acceptUsername(), application initialization flows
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Basic object existence checks
+- Failure modes: Could fail if EMBEDDED_CURRICULUM is malformed or detectUnitAndLessons fails
+
+**Risk Assessment**:
+- Complexity Score: 6/10
+- Lines of Code: 34
+- Cyclomatic Complexity: 4
+- Risk Factors:
+  - [x] No error handling for data processing
+  - [x] Relies on large external data object (37,850+ lines)
+  - [x] Complex data transformation without validation
+  - [x] Regex pattern matching could fail on malformed data
+
+**Example Call Chain**:
+```javascript
+// Application initialization with embedded data
+acceptUsername() -> initializeFromEmbeddedData() -> detectUnitAndLessons() -> renderUnitMenu()
+```
+
+---
+
+## Functions 71-85 (Continued Analysis)
+
+### Function: window.loadUnit
+**Location**: File: index.html, Lines: 1255-1280
+**Type**: Window-attached async function
+**Scope**: Global (window object)
+
+**Purpose**: Asynchronously loads unit curriculum data from external JSON files and transitions to lesson selection interface.
+
+**Inputs**:
+- Parameters:
+  - `unitNumber` (number): Unit number to load, required
+- Global Variables Read:
+  - `currentUnit`: Set to loaded unit number
+  - `allUnitQuestions`: Set with loaded question data
+- DOM Elements Accessed:
+  - `unit-btn-${unitNumber}`: Unit button for loading state indication
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1256-1260: Finds unit button and sets loading state
+2. Lines 1263-1267: Attempts to fetch unit JSON file asynchronously
+3. Lines 1268-1270: Processes loaded data and sets global variables
+4. Lines 1271-1272: Renders lesson selector and shows success message
+5. Lines 1273-1279: Error handling with user feedback and button state reset
+
+**Outputs**:
+- Return Value: None (void, async function)
+- Global Variables Modified:
+  - `currentUnit`: Set to unitNumber
+  - `allUnitQuestions`: Set to loaded question data
+- DOM Modifications:
+  - Button loading states
+  - Lesson selector interface through renderLessonSelector()
+- localStorage Keys Written: None
+- Side Effects: Network request, UI state changes, message display
+
+**Dependencies**:
+- Calls Functions: fetch(), renderLessonSelector(), showMessage()
+- Called By: Unit selection UI interactions
+- External Libraries Used: Fetch API
+
+**Error Handling**:
+- Try/catch blocks: Yes, catches network and parsing errors
+- Validation performed: Response status checking
+- Failure modes: Shows error message and resets button state
+
+**Risk Assessment**:
+- Complexity Score: 6/10
+- Lines of Code: 26
+- Cyclomatic Complexity: 4
+- Risk Factors:
+  - [x] Network dependency could fail
+  - [x] No timeout handling for fetch requests
+  - [x] JSON parsing could fail on malformed data
+  - [x] Global state modification without validation
+
+**Example Call Chain**:
+```javascript
+// User clicks unit button
+onClick -> window.loadUnit(unitNumber) -> fetch() -> renderLessonSelector()
+```
+
+---
+
+### Function: renderLessonSelector
+**Location**: File: index.html, Lines: 1283-1359
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Renders the lesson selection interface with completion status and question counts, supporting both new unitInfo format and legacy fallback.
+
+**Inputs**:
+- Parameters:
+  - `unitInfo` (object): Unit information with lesson structure, optional
+- Global Variables Read:
+  - `currentUnit`: Current unit number
+  - `allUnitQuestions`: Questions for current unit
+  - `unitStructure`: Unit configuration data
+- DOM Elements Accessed:
+  - `questionsContainer`: Container for rendering lesson interface
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1287-1316: If unitInfo provided, uses structured lesson data approach
+2. Lines 1290-1304: Creates lesson buttons with completion status and question counts
+3. Lines 1306-1315: Renders complete lesson selector interface
+4. Lines 1320-1358: Fallback approach using legacy unit structure
+5. Lines 1325-1346: Groups questions by lesson using regex matching
+6. Lines 1338-1347: Creates buttons for each lesson with completion checking
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Completely replaces questionsContainer innerHTML with lesson selector
+- localStorage Keys Written: None
+- Side Effects: Renders interactive lesson selection interface
+
+**Dependencies**:
+- Calls Functions: isQuestionAnswered(), checkLessonCompleted()
+- Called By: loadUnit(), unit navigation functions
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Basic object existence checks
+- Failure modes: Could fail if DOM container doesn't exist
+
+**Risk Assessment**:
+- Complexity Score: 7/10
+- Lines of Code: 77
+- Cyclomatic Complexity: 8
+- Risk Factors:
+  - [x] COMPLEX FUNCTION - HIGH RISK
+  - [x] Two different execution paths increase complexity
+  - [x] Dynamic HTML construction with user data
+  - [x] No error handling for DOM operations
+  - [x] Regex pattern matching without error handling
+
+**Example Call Chain**:
+```javascript
+// Unit loading or navigation
+loadUnit() -> renderLessonSelector(unitInfo) -> [creates lesson interface]
+```
+
+---
+
+### Function: checkLessonCompleted
+**Location**: File: index.html, Lines: 1362-1371
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Determines if all questions in a specific lesson have been answered by the current user.
+
+**Inputs**:
+- Parameters:
+  - `unitNum` (number): Unit number to check, required
+  - `lessonNum` (number): Lesson number to check, required
+- Global Variables Read:
+  - `allUnitQuestions`: Questions to check against
+- DOM Elements Accessed: None
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1363-1366: Filters questions for the specific lesson using regex
+2. Line 1368: Returns false if no questions found for lesson
+3. Line 1370: Checks if all lesson questions have been answered
+
+**Outputs**:
+- Return Value: boolean - true if lesson is completed, false otherwise
+- Global Variables Modified: None
+- DOM Modifications: None
+- localStorage Keys Written: None
+- Side Effects: None
+
+**Dependencies**:
+- Calls Functions: isQuestionAnswered()
+- Called By: renderLessonSelector() for completion status display
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for question array length
+- Failure modes: Could return incorrect results if regex fails
+
+**Risk Assessment**:
+- Complexity Score: 3/10
+- Lines of Code: 10
+- Cyclomatic Complexity: 3
+- Risk Factors:
+  - [x] Regex pattern matching without error handling
+  - [x] No parameter validation
+
+**Example Call Chain**:
+```javascript
+// Lesson completion checking during interface rendering
+renderLessonSelector() -> checkLessonCompleted(unitNum, lessonNum) -> isQuestionAnswered()
+```
+
+---
+
+### Function: window.loadLesson
+**Location**: File: index.html, Lines: 1374-1396
+**Type**: Window-attached function
+**Scope**: Global (window object)
+
+**Purpose**: Loads and filters questions for a specific lesson, handling both numeric lessons and Progress Check (PC) questions.
+
+**Inputs**:
+- Parameters:
+  - `lessonNumber` (number|string): Lesson number or 'PC' for Progress Check, required
+- Global Variables Read:
+  - `allUnitQuestions`: Source questions to filter
+  - `currentLesson`: Set to lesson number
+  - `currentQuestions`: Set to filtered questions
+- DOM Elements Accessed: None directly
+- localStorage Keys Read: None
+
+**Processing**:
+1. Line 1375: Sets current lesson global variable
+2. Lines 1378-1387: Filters questions based on lesson type (PC vs numeric)
+3. Lines 1379: Handles Progress Check questions with specific ID pattern
+4. Lines 1381-1386: Handles numeric lessons with regex matching
+5. Lines 1389-1392: Validates that questions were found
+6. Lines 1394-1395: Logs debug information and renders quiz
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified:
+  - `currentLesson`: Set to lessonNumber
+  - `currentQuestions`: Set to filtered question array
+- DOM Modifications: Indirect through renderQuiz()
+- localStorage Keys Written: None
+- Side Effects: Console logging, quiz rendering
+
+**Dependencies**:
+- Calls Functions: showMessage(), console.log(), renderQuiz()
+- Called By: Lesson selection UI interactions
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for empty question array
+- Failure modes: Shows error message if no questions found
+
+**Risk Assessment**:
+- Complexity Score: 5/10
+- Lines of Code: 23
+- Cyclomatic Complexity: 5
+- Risk Factors:
+  - [x] Regex pattern matching without error handling
+  - [x] Global state modification without validation
+  - [x] No parameter type checking
+
+**Example Call Chain**:
+```javascript
+// User selects lesson
+onClick -> window.loadLesson(lessonNumber) -> renderQuiz()
+```
+
+---
+
+### Function: window.backToUnits
+**Location**: File: index.html, Lines: 1399-1414
+**Type**: Window-attached function
+**Scope**: Global (window object)
+
+**Purpose**: Navigates back to unit selection by cleaning up chart instances and resetting global state variables.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `chartInstances`: Chart objects to destroy
+- Global Variables Modified:
+  - `chartInstances`: Reset to empty object
+  - `currentQuestions`: Reset to empty array
+  - `allUnitQuestions`: Reset to empty array
+  - `currentUnit`: Reset to null
+  - `currentLesson`: Reset to null
+- DOM Elements Accessed: None directly
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1401-1405: Iterates through chart instances and destroys each chart
+2. Lines 1406-1410: Resets all navigation-related global variables
+3. Line 1413: Renders unit selection menu
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: Multiple navigation state variables reset
+- DOM Modifications: Indirect through renderUnitMenu()
+- localStorage Keys Written: None
+- Side Effects: Chart cleanup, UI navigation
+
+**Dependencies**:
+- Calls Functions: chart.destroy(), renderUnitMenu()
+- Called By: Navigation UI interactions
+- External Libraries Used: Chart.js (for chart destruction)
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for chart existence and destroy function
+- Failure modes: Could fail if chart destruction throws errors
+
+**Risk Assessment**:
+- Complexity Score: 4/10
+- Lines of Code: 15
+- Cyclomatic Complexity: 2
+- Risk Factors:
+  - [x] **MEMORY LEAK PREVENTION**: Good chart cleanup implementation
+  - [x] No error handling for chart destruction
+  - [x] Multiple global state resets without validation
+
+**Example Call Chain**:
+```javascript
+// User navigates back to units
+onClick -> window.backToUnits() -> [chart cleanup] -> renderUnitMenu()
+```
+
+---
+
+### Function: window.backToLessons
+**Location**: File: index.html, Lines: 1417-1433
+**Type**: Window-attached function
+**Scope**: Global (window object)
+
+**Purpose**: Navigates back to lesson selection by cleaning up charts and re-detecting unit structure from current questions.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `chartInstances`: Chart objects to destroy
+  - `allUnitQuestions`: Used for unit structure detection
+- Global Variables Modified:
+  - `chartInstances`: Reset to empty object
+  - `currentQuestions`: Reset to empty array
+  - `currentLesson`: Reset to null
+- DOM Elements Accessed: None directly
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1419-1423: Destroys all existing chart instances
+2. Lines 1424-1426: Resets question and lesson state variables
+3. Line 1429: Re-detects unit structure from remaining questions
+4. Line 1432: Renders lesson selector with detected structure
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: Chart and navigation state variables
+- DOM Modifications: Indirect through renderLessonSelector()
+- localStorage Keys Written: None
+- Side Effects: Chart cleanup, lesson interface rendering
+
+**Dependencies**:
+- Calls Functions: chart.destroy(), detectUnitAndLessons(), renderLessonSelector()
+- Called By: Navigation UI interactions from quiz interface
+- External Libraries Used: Chart.js (for chart destruction)
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Checks for chart existence and destroy function
+- Failure modes: Could fail if chart destruction or unit detection throws errors
+
+**Risk Assessment**:
+- Complexity Score: 4/10
+- Lines of Code: 17
+- Cyclomatic Complexity: 2
+- Risk Factors:
+  - [x] **MEMORY LEAK PREVENTION**: Good chart cleanup implementation
+  - [x] No error handling for chart destruction
+  - [x] Relies on unit structure detection accuracy
+
+**Example Call Chain**:
+```javascript
+// User navigates back to lessons from quiz
+onClick -> window.backToLessons() -> detectUnitAndLessons() -> renderLessonSelector()
+```
+
+---
+
+### Function: renderQuiz
+**Location**: File: index.html, Lines: 1436-1476
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Renders the complete quiz interface with questions, controls, and handles progressive loading with MathJax and chart rendering.
+
+**Inputs**:
+- Parameters: None
+- Global Variables Read:
+  - `currentUnit`: For display in header
+  - `currentLesson`: For display in header
+  - `currentQuestions`: Questions to render
+- DOM Elements Accessed:
+  - `questionsContainer`: Main container for quiz interface
+  - `questions-list`: Container for individual questions
+  - `loading-msg`: Loading indicator element
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1439-1449: Creates quiz interface HTML structure with navigation
+2. Lines 1451-1454: Shows loading message during question rendering
+3. Lines 1457-1461: Renders each question with delayed execution for animation
+4. Lines 1463-1475: Completes initialization with progress loading, MathJax, and chart rendering
+
+**Outputs**:
+- Return Value: None (void)
+- Global Variables Modified: None
+- DOM Modifications:
+  - Replaces questionsContainer with complete quiz interface
+  - Adds individual question HTML to questions-list
+- localStorage Keys Written: None
+- Side Effects: MathJax rendering, chart rendering, progress loading
+
+**Dependencies**:
+- Calls Functions: setTimeout(), renderQuestion(), loadProgress(), MathJax.typesetPromise(), renderVisibleCharts()
+- Called By: loadLesson(), question navigation functions
+- External Libraries Used: MathJax
+
+**Error Handling**:
+- Try/catch blocks: No (MathJax has its own error handling)
+- Validation performed: Checks for MathJax existence
+- Failure modes: Could fail if DOM operations throw errors
+
+**Risk Assessment**:
+- Complexity Score: 6/10
+- Lines of Code: 41
+- Cyclomatic Complexity: 3
+- Risk Factors:
+  - [x] Multiple setTimeout calls create timing dependencies
+  - [x] No error handling for DOM operations
+  - [x] Relies on external MathJax library availability
+  - [x] Progressive loading pattern could cause race conditions
+
+**Example Call Chain**:
+```javascript
+// Lesson loading triggers quiz display
+loadLesson() -> renderQuiz() -> renderQuestion() -> loadProgress() -> renderVisibleCharts()
+```
+
+---
+
+### Function: renderQuestion
+**Location**: File: index.html, Lines: 1479-1549+ (continues beyond excerpt)
+**Type**: Named function declaration
+**Scope**: Global
+
+**Purpose**: Renders individual question HTML with answer checking, attempt tracking, and different question type handling (MCQ/FRQ).
+
+**Inputs**:
+- Parameters:
+  - `question` (object): Question data object, required
+  - `index` (number): Question index for numbering, required
+- Global Variables Read:
+  - `currentUsername`: For answer checking
+  - `classData`: For user answer data
+- DOM Elements Accessed: None directly (returns HTML string)
+- localStorage Keys Read: None
+
+**Processing**:
+1. Lines 1480-1494: Calculates question state (answered, attempts, correctness)
+2. Lines 1497-1506: Creates question header with status indicators
+3. Lines 1509-1511: Renders question attachments (charts, tables, images)
+4. Lines 1514-1537: Handles multiple choice questions with selection state
+5. Lines 1540-1549+: Handles free response questions (continues beyond excerpt)
+
+**Outputs**:
+- Return Value: string - Complete HTML for question rendering
+- Global Variables Modified: None
+- DOM Modifications: None (returns HTML string for insertion)
+- localStorage Keys Written: None
+- Side Effects: None
+
+**Dependencies**:
+- Calls Functions: isQuestionAnswered(), getAttemptCount(), canRetry(), getCorrectAnswer(), renderAttachments()
+- Called By: renderQuiz() for each question in current lesson
+- External Libraries Used: None
+
+**Error Handling**:
+- Try/catch blocks: No
+- Validation performed: Basic object property checks
+- Failure modes: Could return malformed HTML if question data is incomplete
+
+**Risk Assessment**:
+- Complexity Score: 8/10
+- Lines of Code: 70+ (continues beyond excerpt)
+- Cyclomatic Complexity: 10+
+- Risk Factors:
+  - [x] COMPLEX FUNCTION - HIGH RISK
+  - [x] Large HTML string construction
+  - [x] Multiple conditional rendering paths
+  - [x] No validation of question data structure
+  - [x] Dynamic content insertion without sanitization
+
+**Example Call Chain**:
+```javascript
+// Quiz rendering calls this for each question
+renderQuiz() -> renderQuestion(question, index) -> renderAttachments() -> [returns HTML]
+```
