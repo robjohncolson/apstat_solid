@@ -904,6 +904,10 @@ if (continueBtn) {
               // Data is in master export format with users object
               dataToMerge = importedData.users[currentUsername];
               console.log('Found user data in users object');
+            } else if (importedData.username && importedData.username === currentUsername && importedData.users && importedData.users[currentUsername]) {
+      // Personal export format with username field
+      dataToMerge = importedData.users[currentUsername];
+      console.log('Found user data in personal export format');
           } else if (importedData.username === currentUsername && importedData.answers) {
               // Data is in personal export format
               dataToMerge = {
@@ -5310,7 +5314,55 @@ if (chartInstances[`dotplot-${questionId}`]) {
                 }
             });
         });
+  // --- File Type Detection Functions ---
 
+  /**
+   * Detects if the imported data is a personal data file
+   * Personal files have username and users object with the user's data
+   */
+   function isPersonalDataFile(data) {
+      // Check for personal export format
+      if (data.username && data.users && data.users[data.username]) {
+          return true;
+      }
+
+      // Check for single user export with answers directly
+      if (data.username && data.answers) {
+          return true;
+      }
+
+      // Check if it has a single user in users object
+      if (data.users && Object.keys(data.users).length === 1) {
+          return true;
+      }
+
+      return false;
+  }
+
+  /**
+   * Detects if the imported data is a master data file
+   * Master files have multiple users or explicit master export type
+   */
+  function isMasterDataFile(data) {
+      // Check for explicit master export type
+      if (data.exportType === 'master_database') {
+          return true;
+      }
+
+      // Check for multiple users
+      if (data.users && Object.keys(data.users).length > 1) {
+          return true;
+      }
+
+      // Check for master export format with allUsers
+      if (data.allUsers && Array.isArray(data.allUsers)) {
+          return true;
+      }
+
+      return false;
+  }
+
+  // --- End of File Type Detection Functions ---
         // Smart Import Function - Auto-detects file type
         function handleSmartImport(event) {
             console.log('handleSmartImport called', event);
@@ -5336,10 +5388,55 @@ if (chartInstances[`dotplot-${questionId}`]) {
 
                     // Store debug info to survive page refresh
                     localStorage.setItem('import_debug', JSON.stringify(debugInfo));
+                    
+                    console.log('File import debug - data keys:', Object.keys(data));
 
-                    console.log('File import debug - data keys:', debugInfo.dataKeys);
-                    console.log('File import debug - isPersonalDataFile:', debugInfo.isPersonal);
-                    console.log('File import debug - isMasterDataFile:', debugInfo.isMaster);
+  // Direct detection logic without external functions
+  let isPersonalFile = false;
+  let isMasterFile = false;
+
+  // Check for personal file formats
+  if (data.username && data.users && data.users[data.username]) {
+      // Standard personal export format
+      isPersonalFile = true;
+      console.log('Detected: Personal export format with username and users');
+  } else if (data.username && data.answers) {
+      // Alternative personal format with direct answers
+      isPersonalFile = true;
+      console.log('Detected: Personal format with direct answers');
+  } else if (data.users && Object.keys(data.users).length === 1) {
+      // Single user export
+      isPersonalFile = true;
+      console.log('Detected: Single user export format');
+  } else if (data.users && Object.keys(data.users).length > 1) {
+      // Multiple users - master file
+      isMasterFile = true;
+      console.log('Detected: Master file with multiple users');
+  } else if (data.exportType === 'master_database') {
+      // Explicit master export
+      isMasterFile = true;
+      console.log('Detected: Master database export');
+  }
+
+  console.log('File import debug - isPersonalFile:', isPersonalFile);
+  console.log('File import debug - isMasterFile:', isMasterFile);
+
+  // Process based on file type
+  if (isPersonalFile) {
+      console.log('Processing as personal data file...');
+      importAndMergePersonalData(data);
+      // Message is handled inside importAndMergePersonalData
+      return;
+  } else if (isMasterFile) {
+      console.log('Processing as master data file...');
+      importMasterData(data);
+      showMessage('✅ Master data imported successfully!', 'success');
+      return;
+  } else {
+      console.error('File structure does not match expected formats');
+      console.log('Data sample:', JSON.stringify(data, null, 2).substring(0, 500) + '...');
+      showMessage('⚠️ Unrecognized file format. Please check your file.', 'error');
+  }
 
                     // Store the data temporarily to survive refresh
                     if (isMasterDataFile(data)) {
@@ -5354,9 +5451,9 @@ if (chartInstances[`dotplot-${questionId}`]) {
                     setTimeout(() => {
                         if (isPersonalDataFile(data)) {
                             console.log('Detected: Personal data file');
-                            importPersonalData(data);
-                            showMessage('✅ Personal data imported successfully!', 'success');
-                        } else if (isMasterDataFile(data)) {
+                            importAndMergePersonalData(data);
+  // Message is now handled inside importAndMergePersonalData for better feedback
+                          } else if (isMasterDataFile(data)) {
                             console.log('Detected: Master database file');
                             importMasterData(data);
                             showMessage('✅ Master database imported successfully!', 'success');
