@@ -615,16 +615,41 @@
             document.body.appendChild(modal);
             modal.style.display = 'block';
 
-            // --- CRITICAL FIX ---
-            // Attach the event listener for the "Continue" button now that it exists in the DOM.
-            // The full logic for this handler will be provided in Phase 3.
-            const continueBtn = document.getElementById('continueWithUsernameBtn');
-            if (continueBtn) {
-                continueBtn.onclick = function() {
-                    // Placeholder for Phase 3 logic. This ensures the handler is correctly attached.
-                    console.log('Continue button clicked. Phase 3 logic will be implemented here.');
-                };
+           // --- Start of New Code for Phase 3 (Revised) ---
+
+// Attach the event listener for the "Continue to Import" button now that it exists in the DOM.
+const continueBtn = document.getElementById('continueWithUsernameBtn');
+if (continueBtn) {
+    continueBtn.onclick = function() {
+        const usernameInput = document.getElementById('manualUsernameInput');
+        const username = usernameInput.value.trim();
+
+        // 1. Validate that the username is not empty.
+        if (!username) {
+            // Use the existing showMessage function for consistent UI feedback.
+            if (typeof showMessage === 'function') {
+                showMessage('Please enter a username to continue.', 'error');
+            } else {
+                alert('Please enter a username to continue.');
             }
+            return;
+        }
+        
+        // 2. Call the existing `acceptUsername` function to establish the session.
+        // CRITICAL: We use the username with its original capitalization to match the "Fruit_Animal" format.
+        acceptUsername(username);
+        
+        // 3. Close the modal.
+        closeRestoreOptionsModal();
+
+        // 4. Display a helpful guidance message to the user.
+        if (typeof showMessage === 'function') {
+            showMessage(`Welcome, ${username}! Use the Sync button (⚡️) to import your personal backup file.`, 'info');
+        }
+    };
+}
+
+// --- End of New Code for Phase 3 (Revised) ---
 
             // Automatically focus the input field for a better user experience
             const usernameInput = document.getElementById('manualUsernameInput');
