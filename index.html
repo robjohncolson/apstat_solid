@@ -862,6 +862,132 @@ if (continueBtn) {
   }
 
   // --- End of mergePersonalData Function for Phase 4.1 ---
+    // --- Start of importAndMergePersonalData Function for Phase 4.2 ---
+
+  /**
+   * Wrapper function that imports personal data with non-destructive merging.
+   * This function handles the integration of imported data using the mergePersonalData logic.
+   * 
+   * @param {Object} importedData - The imported user data object from a JSON file
+   */
+   function importAndMergePersonalData(importedData) {
+      console.log('=== Starting importAndMergePersonalData ===');
+
+      try {
+          // 1. Get the currentUsername - if not set, show error and return
+          if (!currentUsername) {
+              showMessage('No username set. Please establish a session first.', 'error');
+              console.error('No currentUsername set');
+              return;
+          }
+
+          console.log('Processing import for username:', currentUsername);
+
+          // 2. Load the entire classData object from localStorage
+          let classData = JSON.parse(localStorage.getItem('classData') || '{}');
+
+          // Ensure classData has the users object
+          if (!classData.users) {
+              classData.users = {};
+          }
+
+          // 3. Safely access the user's existing data slice
+          let existingUserData = classData.users[currentUsername] || {};
+          console.log('Existing user data keys:', Object.keys(existingUserData));
+
+          // 4. Prepare the imported data for merging
+          // First, check if importedData has the user's data nested inside
+          let dataToMerge = null;
+
+          // Handle different import formats
+          if (importedData.users && importedData.users[currentUsername]) {
+              // Data is in master export format with users object
+              dataToMerge = importedData.users[currentUsername];
+              console.log('Found user data in users object');
+          } else if (importedData.username === currentUsername && importedData.answers) {
+              // Data is in personal export format
+              dataToMerge = {
+                  answers: importedData.answers || {},
+                  reasons: importedData.reasons || {},
+                  timestamps: importedData.timestamps || {},
+                  attempts: importedData.attempts || {},
+                  progress: importedData.progress || {},
+                  badges: importedData.badges || {},
+                  preferences: importedData.preferences || {}
+              };
+              console.log('Using personal export format');
+          } else if (importedData.answers) {
+              // Direct data object format
+              dataToMerge = importedData;
+              console.log('Using direct data format');
+          } else {
+              showMessage('Could not find data for your username in the imported file.', 'error');
+              console.error('No matching data found for username:', currentUsername);
+              return;
+          }
+
+          // Migrate answers to standard format if the function exists
+          if (typeof migrateAnswersToStandardFormat === 'function' && dataToMerge.answers) {
+              console.log('Migrating answers to standard format...');
+              dataToMerge.answers = migrateAnswersToStandardFormat(dataToMerge.answers);
+          }
+
+          // 5. Call mergePersonalData to merge the data
+          console.log('Calling mergePersonalData...');
+          let mergedUserData = mergePersonalData(existingUserData, dataToMerge);
+
+          // 6. Update the main data structure in memory
+          classData.users[currentUsername] = mergedUserData;
+          console.log('Updated classData.users for', currentUsername);
+
+          // 7. Save the entire updated classData object back to localStorage
+          localStorage.setItem('classData', JSON.stringify(classData));
+          console.log('Saved updated classData to localStorage');
+
+          // 8. Call initClassData() to refresh global variables from the new state
+          if (typeof initClassData === 'function') {
+              initClassData();
+              console.log('Reinitialized class data');
+          }
+
+          // 9. Refresh the UI with the merged data
+          // Try to refresh visualizations if the function exists
+          if (typeof refreshAllVisualizations === 'function') {
+              refreshAllVisualizations();
+              console.log('Refreshed all visualizations');
+          } else if (typeof updateProgressDisplay === 'function') {
+              updateProgressDisplay();
+              console.log('Updated progress display');
+          }
+
+          // If we're on a question page, reload it to show the merged data
+          if (typeof currentQuestionId !== 'undefined' && currentQuestionId) {
+              if (typeof loadQuestion === 'function') {
+                  // Extract topic and question number from currentQuestionId if possible
+                  const parts = currentQuestionId.split('-');
+                  if (parts.length >= 3) {
+                      const topic = parts[0] + '-' + parts[1];
+                      const questionNum = parseInt(parts[2].replace('Q', ''));
+                      loadQuestion(topic, questionNum);
+                      console.log('Reloaded current question');
+                  }
+              }
+          }
+
+          // 10. Show success message
+          const answerCount = Object.keys(mergedUserData.answers || {}).length;
+          showMessage(`Successfully merged your personal data! You now have ${answerCount} answers.`, 'success');
+          console.log('=== Merge complete ===');
+          console.log(`Final data contains ${answerCount} answers`);
+
+      } catch (error) {
+          console.error('Error in importAndMergePersonalData:', error);
+          console.error('Stack trace:', error.stack);
+          showMessage('Error merging personal data: ' + error.message, 'error');
+      }
+  }
+
+  // --- End of importAndMergePersonalData Function for Phase 4.2 ---
 
         // Function to import data for a specific user
         function importDataForUser(username, importData) {
