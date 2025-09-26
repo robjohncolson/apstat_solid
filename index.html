@@ -337,7 +337,7 @@
                                 <div class="option-icon">🔄</div>
                                 <h3>Restore</h3>
                                 <p class="option-description">Import master data using CSV student roster</p>
-                                <button onclick="showCSVImportModal()"
+                                <button onclick="showRestoreOptionsModal()"
                                         class="action-button primary">
                                     Restore Data
                                 </button>
@@ -573,6 +573,74 @@
             document.querySelector('.modal').remove();
             pendingImportData = null;
         }
+
+        // --- Start of New Code for Phase 2 (Revised) ---
+
+        function showRestoreOptionsModal() {
+            // Prevent creating duplicate modals
+            if (document.getElementById('restoreOptionsModal')) {
+                return;
+            }
+
+            const modal = document.createElement('div');
+            modal.id = 'restoreOptionsModal';
+            modal.className = 'modal';
+
+            // Using the exact HTML structure you provided in Phase 1
+            modal.innerHTML = `
+                <div class="modal-content enhanced-sync-modal">
+                    <span class="close-modal" onclick="closeRestoreOptionsModal()">&times;</span>
+                    <h3>Choose Restore Method</h3>
+
+                    <div class="restore-option">
+                        <h4>🏫 Classroom Restore</h4>
+                        <p>Your teacher has a master file and a class roster to restore your account.</p>
+                        <button class="action-button primary" onclick="showCSVImportModal(); closeRestoreOptionsModal();">
+                            Use Classroom File
+                        </button>
+                    </div>
+
+                    <div class="restore-option">
+                        <h4>💾 Personal Restore</h4>
+                        <p>You have your username and your personal backup (.json) file.</p>
+                        <input type="text" id="manualUsernameInput" class="username-input"
+                               placeholder="Enter your username (e.g., Apple_Bear)">
+                        <button id="continueWithUsernameBtn" class="action-button primary">
+                            Continue to Import
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            modal.style.display = 'block';
+
+            // --- CRITICAL FIX ---
+            // Attach the event listener for the "Continue" button now that it exists in the DOM.
+            // The full logic for this handler will be provided in Phase 3.
+            const continueBtn = document.getElementById('continueWithUsernameBtn');
+            if (continueBtn) {
+                continueBtn.onclick = function() {
+                    // Placeholder for Phase 3 logic. This ensures the handler is correctly attached.
+                    console.log('Continue button clicked. Phase 3 logic will be implemented here.');
+                };
+            }
+
+            // Automatically focus the input field for a better user experience
+            const usernameInput = document.getElementById('manualUsernameInput');
+            if (usernameInput) {
+                usernameInput.focus();
+            }
+        }
+
+        function closeRestoreOptionsModal() {
+            const modal = document.getElementById('restoreOptionsModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // --- End of New Code for Phase 2 (Revised) ---
 
         // Function to import data for a specific user
         function importDataForUser(username, importData) {
